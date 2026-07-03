@@ -1700,7 +1700,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   {/* Header info */}
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-brand-cream/15 p-4 rounded-xl border border-brand-cream/35">
                     <div className="space-y-1 text-right w-full sm:w-auto">
-                      <span className="text-xs font-bold text-zinc-800 block">أهلاً بك يا شيخ أبو أُسيد في نظام الإدارة الفوري 🌟</span>
+                      <span className="text-xs font-bold text-zinc-800 block">أهلاً بك يا طالب العلم في نظام الإدارة الفوري 🌟</span>
                       <span className="text-[10px] text-brand-emerald-dark block font-sans">أنت الآن متصل مباشرة بقاعدة البيانات السحابية الآمنة للمفاتيح.</span>
                     </div>
                     <button
@@ -1817,7 +1817,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       className="w-full flex items-center justify-between text-xs font-bold text-zinc-700 hover:text-zinc-900 transition-colors cursor-pointer focus:outline-none"
                     >
                       <span className="flex items-center gap-1.5">
-                        <span>⚙️ تغيير كلمة مرور الإدارة الحالية (الشيخ أبو أُسيد)</span>
+                        <span>⚙️ تغيير كلمة مرور الإدارة الحالية (طالب العلم)</span>
                       </span>
                       <span className="text-[10px] text-zinc-500 font-bold">
                         {showChangePasswordForm ? '▲ إغلاق النموذج' : '▼ فتح النموذج'}
@@ -1982,7 +1982,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
               <div>
                 <p className="text-xs text-zinc-300">اسم مطور البرنامج</p>
-                <p className="text-sm font-bold text-white">أبو أُسيد</p>
+                <p className="text-sm font-bold text-white">طالب العلم</p>
               </div>
             </div>
 

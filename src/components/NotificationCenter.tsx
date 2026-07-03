@@ -68,7 +68,7 @@ export const AndroidSystemNotification: React.FC<AndroidSystemNotificationProps>
         <div className="flex items-center justify-between mb-2 text-xs text-zinc-400">
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-brand-emerald animate-pulse" />
-            <span className="font-bold tracking-wide">فوائد أبي أسيد</span>
+            <span className="font-bold tracking-wide">جامع الفوائد</span>
             <span>• الآن</span>
           </div>
           <button onClick={onClose} className="p-1 text-zinc-400 hover:text-white rounded-full hover:bg-zinc-800 transition-colors">
