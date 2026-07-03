@@ -79,7 +79,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="w-14 h-14 rounded-2xl overflow-hidden border border-white/20 flex items-center justify-center shrink-0 shadow-inner">
             <img
               src={scholarlyAppIcon}
-              alt="شعار فوائد أبي أسيد"
+              alt="شعار جامع الفوائد"
               referrerPolicy="no-referrer"
               className="w-full h-full object-cover"
             />

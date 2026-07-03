@@ -113,7 +113,7 @@ export default function App() {
     const defaultSettings: AppSettings = {
       notificationInterval: '24h',
       theme: 'scholarly',
-      programmerName: 'أبو أُسيد',
+      programmerName: 'طالب العلم',
       programmerEmail: 'abuosid773@gmail.com',
       autoBackupInterval: 'off',
       lastBackupTimestamp: 0
@@ -121,6 +121,10 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        if (parsed.programmerName === 'أبو أُسيد' || parsed.programmerName === 'أبو أسيد' || parsed.programmerName === 'أبي أُسيد' || parsed.programmerName === 'أبي أسيد') {
+          parsed.programmerName = 'طالب العلم';
+          localStorage.setItem('abuosid_settings', JSON.stringify(parsed));
+        }
         return { ...defaultSettings, ...parsed };
       } catch (e) {
         return defaultSettings;
@@ -188,7 +192,7 @@ export default function App() {
         if (triggerType !== 'on_change') {
           try {
             const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(backupData);
-            const exportFileDefaultName = `فوائد_أبي_أسيد_احتياطي_${triggerType}_${new Date().toISOString().split('T')[0]}.json`;
+            const exportFileDefaultName = `جامع_الفوائد_احتياطي_${triggerType}_${new Date().toISOString().split('T')[0]}.json`;
             const linkElement = document.createElement('a');
             linkElement.setAttribute('href', dataUri);
             linkElement.setAttribute('download', exportFileDefaultName);

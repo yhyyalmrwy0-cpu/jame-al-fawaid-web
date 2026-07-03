@@ -184,7 +184,7 @@ export const ShareCardModal: React.FC<ShareCardModalProps> = ({
 
   const activeTheme = CARD_THEMES.find(t => t.id === selectedTheme) || CARD_THEMES[0];
   const activeFont = CARD_FONTS.find(f => f.id === selectedFont) || CARD_FONTS[0];
-  const authorName = settings.programmerName || 'أبي أُسيد';
+  const authorName = settings.programmerName || 'طالب العلم';
 
   const generateCardBlobAndDownload = async (action: 'download' | 'share') => {
     // Check Activation Paywall

@@ -47,7 +47,7 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
 
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const textToShare = `📖 فائدة علمية من: [فوائد أبي أسيد]\n\nالعنوان: ${benefit.title}\nالتصنيف: ${benefit.category}\n\n"${benefit.content}"`;
+    const textToShare = `📖 فائدة علمية من: [جامع الفوائد]\n\nالعنوان: ${benefit.title}\nالتصنيف: ${benefit.category}\n\n"${benefit.content}"`;
 
     if (navigator.share) {
       try {
