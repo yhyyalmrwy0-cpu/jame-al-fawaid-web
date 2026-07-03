@@ -510,7 +510,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const handleCopyLink = () => {
     try {
-      const appUrl = window.location.origin + window.location.pathname;
+      const appUrl = 'https://jame-al-fawaid-kc2u.vercel.app';
       navigator.clipboard.writeText(appUrl);
       setCopiedLink(true);
       showToast('تم نسخ رابط التطبيق بنجاح! افتحه على هاتفك لتثبيته كـ PWA.', 'success');

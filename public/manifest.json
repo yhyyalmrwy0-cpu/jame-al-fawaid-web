@@ -1,0 +1,17 @@
+{
+  "short_name": "جامع الفوائد",
+  "name": "جامع الفوائد - لتقييد وتحقيق الفوائد العلمية",
+  "icons": [
+    {
+      "src": "/app_logo.jpg",
+      "sizes": "192x192 512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#ffffff",
+  "theme_color": "#065f46",
+  "display": "standalone",
+  "orientation": "portrait"
+}
