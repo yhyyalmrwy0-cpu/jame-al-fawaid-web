@@ -342,35 +342,46 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       return;
     }
 
+    const password = adminPasswordInput.trim();
+
     try {
       const response = await fetch(getApiUrl('/api/admin/keys'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ password: adminPasswordInput.trim() }),
+        body: JSON.stringify({ password }),
       });
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setIsAdminLoggedIn(true);
-        setAdminKeysList(data.keys);
-        if (data.stats) {
-          setAdminStats(data.stats);
-          localStorage.setItem('abuosid_admin_stats', JSON.stringify(data.stats));
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setIsAdminLoggedIn(true);
+          setAdminKeysList(data.keys || {});
+          if (data.stats) {
+            setAdminStats(data.stats);
+          }
+          showToast('مرحباً بك يا شيخ في لوحة التحكم وتوليد الرموز بنجاح! 🔑', 'success');
+          return;
+        } else {
+          showToast(data.message || 'كلمة المرور غير صحيحة!', 'warning');
+          return;
         }
-        showToast('مرحباً بك يا شيخ في لوحة التحكم وتوليد الرموز بنجاح! 🔑', 'success');
       } else {
-        showToast(data.message || 'كلمة المرور غير صحيحة!', 'warning');
+        const errorData = await response.json().catch(() => ({}));
+        showToast(errorData.message || 'كلمة المرور غير صحيحة!', 'warning');
       }
     } catch (error) {
-      showToast('فشل في الاتصال بالخادم لجلب المفاتيح. يرجى التحقق من اتصالك.', 'warning');
+      console.error('Could not connect to online server for admin login:', error);
+      showToast('فشل الاتصال بخادم قاعدة البيانات. يرجى التحقق من اتصالك بالإنترنت والملفات الدستورية.', 'warning');
     }
   };
 
   const handleGenerateKey = async () => {
     setIsGeneratingKey(true);
+    const password = adminPasswordInput.trim();
+    const note = newKeyNote.trim() || 'مفتاح مخصص لشخص واحد';
+
     try {
       const response = await fetch(getApiUrl('/api/admin/generate-key'), {
         method: 'POST',
@@ -378,43 +389,51 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          password: adminPasswordInput.trim(),
-          note: newKeyNote.trim() || 'مفتاح مخصص لشخص واحد'
+          password,
+          note
         }),
       });
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        showToast(`تم توليد مفتاح تفعيل جديد بنجاح: ${data.key}`, 'success');
-        setNewKeyNote('');
-        // Refresh key list
-        const listResponse = await fetch(getApiUrl('/api/admin/keys'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ password: adminPasswordInput.trim() }),
-        });
-        const listData = await listResponse.json();
-        if (listResponse.ok && listData.success) {
-          setAdminKeysList(listData.keys);
-          if (listData.stats) {
-            setAdminStats(listData.stats);
-            localStorage.setItem('abuosid_admin_stats', JSON.stringify(listData.stats));
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          showToast(`تم توليد مفتاح تفعيل جديد بنجاح: ${data.key}`, 'success');
+          setNewKeyNote('');
+          
+          const listResponse = await fetch(getApiUrl('/api/admin/keys'), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ password }),
+          });
+          const listData = await listResponse.json();
+          if (listResponse.ok && listData.success) {
+            setAdminKeysList(listData.keys || {});
+            if (listData.stats) {
+              setAdminStats(listData.stats);
+            }
           }
+          setIsGeneratingKey(false);
+          return;
+        } else {
+          showToast(data.message || 'فشل توليد المفتاح على الخادم.', 'warning');
         }
       } else {
-        showToast(data.message || 'فشل توليد المفتاح.', 'warning');
+        const errorData = await response.json().catch(() => ({}));
+        showToast(errorData.message || 'فشل توليد المفتاح.', 'warning');
       }
     } catch (error) {
-      showToast('حدث خطأ في الشبكة أثناء توليد المفتاح.', 'warning');
-    } finally {
-      setIsGeneratingKey(false);
+      console.error('Error generating key online:', error);
+      showToast('خطأ في الاتصال بالخادم السحابي لتوليد المفتاح.', 'warning');
     }
+
+    setIsGeneratingKey(false);
   };
 
   const handleDeleteKey = async (keyToDelete: string) => {
+    const password = adminPasswordInput.trim();
+
     requestConfirm('تأكيد الحذف 🗑️', 'هل أنت متأكد من رغبتك في حذف هذا المفتاح نهائياً؟', async () => {
       setIsDeletingKey(keyToDelete);
       try {
@@ -424,39 +443,45 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            password: adminPasswordInput.trim(),
+            password,
             keyToDelete
           }),
         });
 
-        const data = await response.json();
-
-        if (response.ok && data.success) {
-          showToast('تم حذف مفتاح التفعيل بنجاح من قاعدة البيانات.', 'success');
-          // Refresh key list
-          const listResponse = await fetch(getApiUrl('/api/admin/keys'), {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ password: adminPasswordInput.trim() }),
-          });
-          const listData = await listResponse.json();
-          if (listResponse.ok && listData.success) {
-            setAdminKeysList(listData.keys);
-            if (listData.stats) {
-              setAdminStats(listData.stats);
-              localStorage.setItem('abuosid_admin_stats', JSON.stringify(listData.stats));
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            showToast('تم حذف مفتاح التفعيل بنجاح من قاعدة البيانات.', 'success');
+            
+            const listResponse = await fetch(getApiUrl('/api/admin/keys'), {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ password }),
+            });
+            const listData = await listResponse.json();
+            if (listResponse.ok && listData.success) {
+              setAdminKeysList(listData.keys || {});
+              if (listData.stats) {
+                setAdminStats(listData.stats);
+              }
             }
+            setIsDeletingKey(null);
+            return;
+          } else {
+            showToast(data.message || 'فشل حذف المفتاح من قاعدة البيانات.', 'warning');
           }
         } else {
-          showToast(data.message || 'فشل حذف المفتاح.', 'warning');
+          const errorData = await response.json().catch(() => ({}));
+          showToast(errorData.message || 'فشل حذف المفتاح.', 'warning');
         }
       } catch (error) {
-        showToast('حدث خطأ في الشبكة أثناء حذف المفتاح.', 'warning');
-      } finally {
-        setIsDeletingKey(null);
+        console.error('Error deleting key online:', error);
+        showToast('فشل في الاتصال بالشبكة لحذف المفتاح.', 'warning');
       }
+
+      setIsDeletingKey(null);
     });
   };
 
@@ -485,10 +510,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           });
           const listData = await listResponse.json();
           if (listResponse.ok && listData.success) {
-            setAdminKeysList(listData.keys);
+            setAdminKeysList(listData.keys || {});
             if (listData.stats) {
               setAdminStats(listData.stats);
-              localStorage.setItem('abuosid_admin_stats', JSON.stringify(listData.stats));
             }
           }
         } else {
@@ -565,7 +589,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         if (data.success) {
           setIsActivated(true);
           localStorage.setItem('abuosid_app_activated', 'true');
-          localStorage.setItem('abuosid_activation_key', trimmedKey);
+          localStorage.setItem('abuosid_activation_key', trimmedKey.toUpperCase().trim());
+          
           showToast('تم التحقق والتفعيل عبر الإنترنت بنجاح! تم فتح ميزات النسخة المدفوعة والنسخ الاحتياطي السحابي وتصدير PDF مدى الحياة. 🎉', 'success');
           setIsActivating(false);
           return;
@@ -1803,7 +1828,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <div className="p-3.5 rounded-xl bg-brand-cream/10 border border-brand-cream/40 text-center space-y-1 col-span-2 sm:col-span-1">
                       <span className="text-[10px] text-zinc-500 font-bold block">👥 إجمالي الزوار للمنصة</span>
                       <span className="text-xl font-black text-zinc-800 font-mono">
-                        {adminStats?.totalVisitors ?? Number(localStorage.getItem('abuosid_local_visitors_count') || 1)}
+                        {adminStats?.totalVisitors ?? 0}
                       </span>
                     </div>
 
@@ -1811,7 +1836,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <div className="p-3.5 rounded-xl bg-amber-50/60 border border-amber-200 text-center space-y-1 col-span-2 sm:col-span-1">
                       <span className="text-[10px] text-amber-800 font-bold block">⭐ المشتركين الفعليين</span>
                       <span className="text-xl font-black text-amber-700 font-mono">
-                        {adminStats?.totalSubscribers ?? (Object.values(adminKeysList) as any[]).filter(k => k.used).length}
+                        {adminStats?.totalSubscribers ?? 0}
                       </span>
                     </div>
 

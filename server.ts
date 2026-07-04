@@ -3,6 +3,21 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import { initializeApp } from "firebase/app";
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc, 
+  getDocs, 
+  query, 
+  where, 
+  limit, 
+  orderBy 
+} from "firebase/firestore";
 
 async function startServer() {
   const app = express();
@@ -96,55 +111,101 @@ async function startServer() {
     }
   });
 
-  // Setup/Ensure data directory and file exists
-  const dataDir = path.join(process.cwd(), 'data');
-  const dbPath = path.join(dataDir, 'activation.json');
-  
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+  // Initialize Firebase using the config file or Environment Variables
+  let db: any;
+
+  try {
+    let firebaseConfig: any = null;
+    const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+    
+    if (fs.existsSync(firebaseConfigPath)) {
+      firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf-8"));
+    } else if (process.env.FIREBASE_API_KEY) {
+      firebaseConfig = {
+        apiKey: process.env.FIREBASE_API_KEY,
+        authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+        appId: process.env.FIREBASE_APP_ID,
+        firestoreDatabaseId: process.env.FIREBASE_FIRESTORE_DATABASE_ID || ""
+      };
+    }
+
+    if (firebaseConfig) {
+      const firebaseApp = initializeApp(firebaseConfig);
+      db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || undefined);
+      console.log("Firebase initialized successfully on server.");
+    } else {
+      console.warn("No Firebase configuration found (either firebase-applet-config.json or Environment Variables).");
+    }
+  } catch (err) {
+    console.error("Failed to initialize Firebase on server:", err);
   }
 
-  const initialKeys = {
-    "ABU-OSID-PREMIUM-1111": { used: false, activatedAt: null, deviceId: null },
-    "ABU-OSID-PREMIUM-2222": { used: false, activatedAt: null, deviceId: null },
-    "ABU-OSID-PREMIUM-3333": { used: false, activatedAt: null, deviceId: null },
-    "ABU-OSID-PREMIUM-4444": { used: false, activatedAt: null, deviceId: null },
-    "ABU-OSID-PREMIUM-5555": { used: false, activatedAt: null, deviceId: null }
-  };
-
-  if (!fs.existsSync(dbPath)) {
-    fs.writeFileSync(dbPath, JSON.stringify({ keys: initialKeys }, null, 2), 'utf-8');
-  }
-
-  // Helper functions to get and set dynamic admin password stored in JSON file
-  function getAdminPassword(): string {
+  // Pre-seed initial keys if the collection is empty
+  async function ensureInitialKeys() {
+    if (!db) return;
     try {
-      if (fs.existsSync(dbPath)) {
-        const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
-        if (dbData.adminPassword) {
-          if (dbData.adminPassword === "abuosid2026") {
-            dbData.adminPassword = "abuosid2026773793533";
-            fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2), 'utf-8');
-          }
-          return dbData.adminPassword;
+      const keysColl = collection(db, "activation_keys");
+      const snapshot = await getDocs(query(keysColl, limit(1)));
+      if (snapshot.empty) {
+        console.log("Seeding initial activation keys into Firestore...");
+        const initialKeys: { [key: string]: string } = {
+          "ABU-OSID-PREMIUM-1111": "مفتاح تجريبي أول",
+          "ABU-OSID-PREMIUM-2222": "مفتاح تجريبي ثانٍ",
+          "ABU-OSID-PREMIUM-3333": "مفتاح تجريبي ثالث",
+          "ABU-OSID-PREMIUM-4444": "مفتاح تجريبي رابع",
+          "ABU-OSID-PREMIUM-5555": "مفتاح تجريبي خامس"
+        };
+        for (const [key, note] of Object.entries(initialKeys)) {
+          await setDoc(doc(db, "activation_keys", key), {
+            used: false,
+            activatedAt: null,
+            deviceId: null,
+            note: note,
+            createdAt: Date.now()
+          });
         }
       }
+    } catch (error) {
+      console.error("Error seeding initial keys in Firestore:", error);
+    }
+  }
+
+  // Trigger seeding
+  ensureInitialKeys();
+
+  // Helper functions to get and set dynamic admin password stored in Firestore
+  async function getAdminPassword(): Promise<string> {
+    if (!db) return "abuosid2026773793533";
+    try {
+      const adminDocRef = doc(db, "app_state", "admin");
+      const adminDocSnap = await getDoc(adminDocRef);
+      if (adminDocSnap.exists()) {
+        const data = adminDocSnap.data();
+        if (data.adminPassword) {
+          return data.adminPassword;
+        }
+      } else {
+        const defaultPass = "abuosid2026773793533";
+        await setDoc(adminDocRef, { adminPassword: defaultPass });
+        return defaultPass;
+      }
     } catch (e) {
-      console.error("Error reading admin password:", e);
+      console.error("Error reading admin password from Firestore:", e);
     }
     return "abuosid2026773793533";
   }
 
-  function setAdminPassword(newPassword: string): boolean {
+  async function setAdminPassword(newPassword: string): Promise<boolean> {
+    if (!db) return false;
     try {
-      const dbData = fs.existsSync(dbPath)
-        ? JSON.parse(fs.readFileSync(dbPath, 'utf-8'))
-        : { keys: initialKeys };
-      dbData.adminPassword = newPassword;
-      fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2), 'utf-8');
+      const adminDocRef = doc(db, "app_state", "admin");
+      await setDoc(adminDocRef, { adminPassword: newPassword });
       return true;
     } catch (e) {
-      console.error("Error writing admin password:", e);
+      console.error("Error writing admin password to Firestore:", e);
       return false;
     }
   }
@@ -162,37 +223,59 @@ async function startServer() {
   }
 
   // API Route: Verify Activation Key
-  app.post("/api/activate", (req, res) => {
+  app.post("/api/activate", async (req, res) => {
     try {
       const { code, deviceId } = req.body;
       if (!code) {
         return res.status(400).json({ success: false, message: "يرجى تزويد كود التفعيل لتتم عملية التنشيط." });
       }
 
-      const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
-      const normalizedCode = code.trim().toUpperCase();
-      let keyEntry = dbData.keys[normalizedCode];
+      if (!db) {
+        return res.status(500).json({ success: false, message: "قاعدة البيانات غير متصلة بالخادم حالياً." });
+      }
 
-      if (!keyEntry) {
+      const normalizedCode = code.trim().toUpperCase();
+      const keyDocRef = doc(db, "activation_keys", normalizedCode);
+      const keyDocSnap = await getDoc(keyDocRef);
+
+      if (!keyDocSnap.exists()) {
         return res.status(400).json({ success: false, message: "مفتاح التفعيل هذا غير صحيح أو غير موجود." });
       }
 
-      if (keyEntry.used) {
+      const keyData = keyDocSnap.data();
+      if (keyData.used) {
         return res.status(400).json({ success: false, message: "مفتاح التفعيل هذا تم استخدامه مسبقاً لتنشيط جهاز آخر." });
       }
 
-      // Mark as used
-      dbData.keys[normalizedCode] = {
+      // Mark as used in Firestore
+      await updateDoc(keyDocRef, {
         used: true,
         activatedAt: Date.now(),
         deviceId: deviceId || 'unknown'
-      };
+      });
 
       // Update persistent stats
-      dbData.stats = dbData.stats || { totalVisitors: 0, totalSubscribers: 0 };
-      dbData.stats.totalSubscribers = Object.values(dbData.keys).filter((k: any) => k.used).length;
+      try {
+        const statsDocRef = doc(db, "app_state", "stats");
+        const statsSnap = await getDoc(statsDocRef);
+        let totalVisitors = 1;
+        if (statsSnap.exists()) {
+          totalVisitors = statsSnap.data().totalVisitors || 1;
+        }
+        
+        const allKeysSnap = await getDocs(collection(db, "activation_keys"));
+        let usedKeysCount = 0;
+        allKeysSnap.forEach((docSnap) => {
+          if (docSnap.data().used) usedKeysCount++;
+        });
 
-      fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2), 'utf-8');
+        await setDoc(statsDocRef, {
+          totalVisitors,
+          totalSubscribers: usedKeysCount
+        }, { merge: true });
+      } catch (err) {
+        console.error("Error updating stats during activation:", err);
+      }
 
       return res.json({ success: true, message: "تم التحقق والتفعيل عبر الإنترنت بنجاح! تم فتح ميزة تصدير الـ PDF." });
     } catch (error) {
@@ -202,17 +285,42 @@ async function startServer() {
   });
 
   // API Route: Register Visit
-  app.post("/api/stats/visit", (req, res) => {
+  app.post("/api/stats/visit", async (req, res) => {
     try {
-      const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
-      dbData.stats = dbData.stats || { totalVisitors: 0, totalSubscribers: 0 };
-      dbData.stats.totalVisitors = (dbData.stats.totalVisitors || 0) + 1;
-      
-      const usedKeysCount = Object.values(dbData.keys).filter((k: any) => k.used).length;
-      dbData.stats.totalSubscribers = usedKeysCount;
+      if (!db) {
+        return res.json({ success: true, stats: { totalVisitors: 1, totalSubscribers: 0 } });
+      }
 
-      fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2), 'utf-8');
-      return res.json({ success: true, stats: dbData.stats });
+      const statsDocRef = doc(db, "app_state", "stats");
+      const statsSnap = await getDoc(statsDocRef);
+      let totalVisitors = 0;
+      let totalSubscribers = 0;
+      
+      if (statsSnap.exists()) {
+        const d = statsSnap.data();
+        totalVisitors = d.totalVisitors || 0;
+        totalSubscribers = d.totalSubscribers || 0;
+      }
+      
+      totalVisitors += 1;
+      
+      try {
+        const allKeysSnap = await getDocs(collection(db, "activation_keys"));
+        let usedKeysCount = 0;
+        allKeysSnap.forEach((docSnap) => {
+          if (docSnap.data().used) usedKeysCount++;
+        });
+        totalSubscribers = usedKeysCount;
+      } catch (err) {
+        console.error("Error counting keys during stats visit:", err);
+      }
+
+      await setDoc(statsDocRef, {
+        totalVisitors,
+        totalSubscribers
+      }, { merge: true });
+
+      return res.json({ success: true, stats: { totalVisitors, totalSubscribers } });
     } catch (error) {
       console.error("Stats visit error:", error);
       return res.status(500).json({ success: false, message: "حدث خطأ أثناء تسجيل الزيارة." });
@@ -220,28 +328,46 @@ async function startServer() {
   });
 
   // API Route: Get Admin Stats
-  app.post("/api/admin/stats", (req, res) => {
+  app.post("/api/admin/stats", async (req, res) => {
     try {
       const { password } = req.body;
-      if (password !== getAdminPassword()) {
+      const adminPass = await getAdminPassword();
+      if (password !== adminPass) {
         return res.status(401).json({ success: false, message: "كلمة مرور الإدارة غير صحيحة!" });
       }
 
-      const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
-      dbData.stats = dbData.stats || { totalVisitors: 0, totalSubscribers: 0 };
-      const usedKeysCount = Object.values(dbData.keys).filter((k: any) => k.used).length;
-      dbData.stats.totalSubscribers = usedKeysCount;
+      if (!db) {
+        return res.status(500).json({ success: false, message: "قاعدة البيانات غير متصلة بالخادم حالياً." });
+      }
 
-      fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2), 'utf-8');
+      const statsDocRef = doc(db, "app_state", "stats");
+      const statsSnap = await getDoc(statsDocRef);
+      let totalVisitors = 0;
+      if (statsSnap.exists()) {
+        totalVisitors = statsSnap.data().totalVisitors || 0;
+      }
+
+      const allKeysSnap = await getDocs(collection(db, "activation_keys"));
+      let usedKeysCount = 0;
+      let totalKeysCount = 0;
+      allKeysSnap.forEach((docSnap) => {
+        totalKeysCount++;
+        if (docSnap.data().used) usedKeysCount++;
+      });
+
+      await setDoc(statsDocRef, {
+        totalVisitors,
+        totalSubscribers: usedKeysCount
+      }, { merge: true });
 
       return res.json({
         success: true,
         stats: {
-          totalVisitors: dbData.stats.totalVisitors || 0,
-          totalSubscribers: dbData.stats.totalSubscribers || 0,
-          totalKeys: Object.keys(dbData.keys).length,
+          totalVisitors,
+          totalSubscribers: usedKeysCount,
+          totalKeys: totalKeysCount,
           usedKeys: usedKeysCount,
-          freeKeys: Object.keys(dbData.keys).length - usedKeysCount
+          freeKeys: totalKeysCount - usedKeysCount
         }
       });
     } catch (error) {
@@ -251,54 +377,83 @@ async function startServer() {
   });
 
   // API Route: Get Admin Keys (secured with password)
-  app.post("/api/admin/keys", (req, res) => {
+  app.post("/api/admin/keys", async (req, res) => {
     try {
       const { password } = req.body;
-      if (password !== getAdminPassword()) {
+      const adminPass = await getAdminPassword();
+      if (password !== adminPass) {
         return res.status(401).json({ success: false, message: "كلمة مرور الإدارة غير صحيحة!" });
       }
 
-      const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
-      dbData.stats = dbData.stats || { totalVisitors: 0, totalSubscribers: 0 };
-      const usedKeysCount = Object.values(dbData.keys).filter((k: any) => k.used).length;
-      dbData.stats.totalSubscribers = usedKeysCount;
+      if (!db) {
+        return res.status(500).json({ success: false, message: "قاعدة البيانات غير متصلة بالخادم حالياً." });
+      }
+
+      const allKeysSnap = await getDocs(collection(db, "activation_keys"));
+      const keys: { [key: string]: any } = {};
+      let usedKeysCount = 0;
+      let totalKeysCount = 0;
+
+      allKeysSnap.forEach((docSnap) => {
+        totalKeysCount++;
+        const d = docSnap.data();
+        keys[docSnap.id] = {
+          used: d.used,
+          activatedAt: d.activatedAt,
+          deviceId: d.deviceId,
+          note: d.note || "",
+          createdAt: d.createdAt || 0
+        };
+        if (d.used) usedKeysCount++;
+      });
+
+      const statsDocRef = doc(db, "app_state", "stats");
+      const statsSnap = await getDoc(statsDocRef);
+      let totalVisitors = 0;
+      if (statsSnap.exists()) {
+        totalVisitors = statsSnap.data().totalVisitors || 0;
+      }
 
       return res.json({
         success: true,
-        keys: dbData.keys,
+        keys: keys,
         stats: {
-          totalVisitors: dbData.stats.totalVisitors || 0,
-          totalSubscribers: dbData.stats.totalSubscribers || 0,
-          totalKeys: Object.keys(dbData.keys).length,
+          totalVisitors,
+          totalSubscribers: usedKeysCount,
+          totalKeys: totalKeysCount,
           usedKeys: usedKeysCount,
-          freeKeys: Object.keys(dbData.keys).length - usedKeysCount
+          freeKeys: totalKeysCount - usedKeysCount
         }
       });
     } catch (error) {
+      console.error("Get admin keys error:", error);
       return res.status(500).json({ success: false, message: "حدث خطأ في جلب مفاتيح التفعيل." });
     }
   });
 
   // API Route: Generate a new single-use key
-  app.post("/api/admin/generate-key", (req, res) => {
+  app.post("/api/admin/generate-key", async (req, res) => {
     try {
       const { password, note } = req.body;
-      if (password !== getAdminPassword()) {
+      const adminPass = await getAdminPassword();
+      if (password !== adminPass) {
         return res.status(401).json({ success: false, message: "كلمة مرور الإدارة غير صحيحة!" });
       }
 
-      const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
-      const newKey = generateRandomCode();
+      if (!db) {
+        return res.status(500).json({ success: false, message: "قاعدة البيانات غير متصلة بالخادم حالياً." });
+      }
 
-      dbData.keys[newKey] = {
+      const newKey = generateRandomCode();
+      const keyDocRef = doc(db, "activation_keys", newKey);
+      await setDoc(keyDocRef, {
         used: false,
         activatedAt: null,
         deviceId: null,
         note: note || "مفتاح لشخص واحد",
         createdAt: Date.now()
-      };
+      });
 
-      fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2), 'utf-8');
       return res.json({ success: true, key: newKey });
     } catch (error) {
       console.error("Key generation error:", error);
@@ -307,31 +462,37 @@ async function startServer() {
   });
 
   // API Route: Delete an activation key
-  app.post("/api/admin/delete-key", (req, res) => {
+  app.post("/api/admin/delete-key", async (req, res) => {
     try {
       const { password, keyToDelete } = req.body;
-      if (password !== getAdminPassword()) {
+      const adminPass = await getAdminPassword();
+      if (password !== adminPass) {
         return res.status(401).json({ success: false, message: "كلمة مرور الإدارة غير صحيحة!" });
       }
 
-      const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
-      if (dbData.keys[keyToDelete]) {
-        delete dbData.keys[keyToDelete];
-        fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2), 'utf-8');
+      if (!db) {
+        return res.status(500).json({ success: false, message: "قاعدة البيانات غير متصلة بالخادم حالياً." });
+      }
+
+      const keyDocRef = doc(db, "activation_keys", keyToDelete);
+      const keyDocSnap = await getDoc(keyDocRef);
+      if (keyDocSnap.exists()) {
+        await deleteDoc(keyDocRef);
         return res.json({ success: true, message: "تم حذف مفتاح التفعيل بنجاح." });
       } else {
         return res.status(400).json({ success: false, message: "المفتاح غير موجود بالفعل." });
       }
     } catch (error) {
+      console.error("Delete key error:", error);
       return res.status(500).json({ success: false, message: "حدث خطأ أثناء حذف المفتاح." });
     }
   });
 
   // API Route: Change Admin Password
-  app.post("/api/admin/change-password", (req, res) => {
+  app.post("/api/admin/change-password", async (req, res) => {
     try {
       const { password, newPassword } = req.body;
-      const currentPassword = getAdminPassword();
+      const currentPassword = await getAdminPassword();
       if (password !== currentPassword) {
         return res.status(401).json({ success: false, message: "كلمة مرور الإدارة الحالية غير صحيحة!" });
       }
@@ -340,69 +501,127 @@ async function startServer() {
         return res.status(400).json({ success: false, message: "يجب أن تكون كلمة المرور الجديدة مكونة من 4 أحرف أو أكثر." });
       }
 
-      setAdminPassword(newPassword.trim());
-      return res.json({ success: true, message: "تم تغيير كلمة مرور الإدارة بنجاح!" });
+      const success = await setAdminPassword(newPassword.trim());
+      if (success) {
+        return res.json({ success: true, message: "تم تغيير كلمة مرور الإدارة بنجاح!" });
+      } else {
+        return res.status(500).json({ success: false, message: "فشل حفظ كلمة المرور الجديدة على قاعدة البيانات." });
+      }
     } catch (error) {
+      console.error("Change password error:", error);
       return res.status(500).json({ success: false, message: "حدث خطأ أثناء تغيير كلمة المرور." });
     }
   });
 
   // API Route: Reset Demo database keys (convenience for AI Studio previewing)
-  app.post("/api/admin/reset-keys", (req, res) => {
+  app.post("/api/admin/reset-keys", async (req, res) => {
     try {
       const { password } = req.body;
-      if (password !== getAdminPassword()) {
+      const adminPass = await getAdminPassword();
+      if (password !== adminPass) {
         return res.status(401).json({ success: false, message: "كلمة مرور الإدارة غير صحيحة!" });
       }
 
-      const currentPassword = getAdminPassword();
-      const dbData = { keys: initialKeys, adminPassword: currentPassword };
-      fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2), 'utf-8');
-      return res.json({ success: true, message: "تم إعادة تهيئة قاعدة البيانات للمفاتيح التجريبية بنجاح." });
+      if (!db) {
+        return res.status(500).json({ success: false, message: "قاعدة البيانات غير متصلة بالخادم حالياً." });
+      }
+
+      // Delete all current keys
+      const keysColl = collection(db, "activation_keys");
+      const allKeysSnap = await getDocs(keysColl);
+      for (const docSnap of allKeysSnap.docs) {
+        await deleteDoc(doc(db, "activation_keys", docSnap.id));
+      }
+
+      // Seed the initial keys
+      const initialKeys: { [key: string]: string } = {
+        "ABU-OSID-PREMIUM-1111": "مفتاح تجريبي أول",
+        "ABU-OSID-PREMIUM-2222": "مفتاح تجريبي ثانٍ",
+        "ABU-OSID-PREMIUM-3333": "مفتاح تجريبي ثالث",
+        "ABU-OSID-PREMIUM-4444": "مفتاح تجريبي رابع",
+        "ABU-OSID-PREMIUM-5555": "مفتاح تجريبي خامس"
+      };
+      for (const [key, note] of Object.entries(initialKeys)) {
+        await setDoc(doc(db, "activation_keys", key), {
+          used: false,
+          activatedAt: null,
+          deviceId: null,
+          note: note,
+          createdAt: Date.now()
+        });
+      }
+
+      return res.json({ success: true, message: "تمت إعادة تعيين مفاتيح التفعيل لقاعدة البيانات الافتراضية بنجاح." });
     } catch (error) {
-      return res.status(500).json({ success: false, message: "حدث خطأ أثناء تهيئة المفاتيح." });
+      console.error("Reset keys error:", error);
+      return res.status(500).json({ success: false, message: "حدث خطأ أثناء إعادة تعيين مفاتيح التفعيل." });
     }
   });
 
   // API Route: Save Cloud Backup
-  app.post("/api/backup/save", (req, res) => {
+  app.post("/api/backup/save", async (req, res) => {
     try {
       const { code, email, backupData } = req.body;
       if (!code) {
         return res.status(400).json({ success: false, message: "يرجى تزويد كود التفعيل لحفظ النسخة السحابية." });
       }
 
-      const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
-      const normalizedCode = code.trim().toUpperCase();
-      const keyEntry = dbData.keys[normalizedCode];
+      if (!db) {
+        return res.status(500).json({ success: false, message: "قاعدة البيانات غير متصلة بالخادم حالياً." });
+      }
 
-      if (!keyEntry) {
+      const normalizedCode = code.trim().toUpperCase();
+      const keyDocRef = doc(db, "activation_keys", normalizedCode);
+      const keyDocSnap = await getDoc(keyDocRef);
+
+      if (!keyDocSnap.exists()) {
         return res.status(400).json({ success: false, message: "كود التفعيل غير صالح لحفظ نسخة احتياطية سحابية." });
       }
 
-      if (!dbData.backups) {
-        dbData.backups = {};
-      }
-
-      const backupKey = email ? `${normalizedCode}_${email.trim().toLowerCase()}` : normalizedCode;
-
-      if (!dbData.backups[backupKey]) {
-        dbData.backups[backupKey] = [];
-      }
-
+      const backupId = `cloud-${Date.now()}`;
+      const backupDocRef = doc(db, "cloud_backups", backupId);
+      
       const newBackup = {
-        id: `cloud-${Date.now()}`,
+        id: backupId,
+        code: normalizedCode,
+        email: email ? email.trim().toLowerCase() : "",
         timestamp: Date.now(),
         trigger: backupData.trigger || 'manual',
         benefitsCount: backupData.benefitsCount || 0,
         queriesCount: backupData.queriesCount || 0,
-        data: backupData.data // stringified JSON
+        data: backupData.data, // stringified JSON
+        createdAt: Date.now()
       };
 
-      dbData.backups[backupKey].unshift(newBackup);
-      dbData.backups[backupKey] = dbData.backups[backupKey].slice(0, 10); // store up to 10 backups
+      await setDoc(backupDocRef, newBackup);
 
-      fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2), 'utf-8');
+      // Clean up older backups for this key/email combo if they exceed 10
+      try {
+        const backupKeyEmail = email ? email.trim().toLowerCase() : "";
+        const backupsColl = collection(db, "cloud_backups");
+        const q = query(
+          backupsColl,
+          where("code", "==", normalizedCode),
+          where("email", "==", backupKeyEmail)
+        );
+        
+        const snapshot = await getDocs(q);
+        const userBackups: any[] = [];
+        snapshot.forEach((d) => userBackups.push({ id: d.id, ...d.data() }));
+        
+        // Sort in descending order
+        userBackups.sort((a, b) => b.timestamp - a.timestamp);
+        
+        // Delete extra backups beyond 10
+        if (userBackups.length > 10) {
+          const toDelete = userBackups.slice(10);
+          for (const b of toDelete) {
+            await deleteDoc(doc(db, "cloud_backups", b.id));
+          }
+        }
+      } catch (err) {
+        console.error("Error pruning old backups:", err);
+      }
 
       return res.json({ success: true, message: "تم رفع وحفظ النسخة الاحتياطية السحابية بنجاح!", backup: newBackup });
     } catch (error) {
@@ -412,23 +631,50 @@ async function startServer() {
   });
 
   // API Route: List Cloud Backups
-  app.post("/api/backup/list", (req, res) => {
+  app.post("/api/backup/list", async (req, res) => {
     try {
       const { code, email } = req.body;
       if (!code) {
         return res.status(400).json({ success: false, message: "كود التفعيل مطلوب." });
       }
 
-      const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
-      const normalizedCode = code.trim().toUpperCase();
-      const keyEntry = dbData.keys[normalizedCode];
+      if (!db) {
+        return res.status(500).json({ success: false, message: "قاعدة البيانات غير متصلة بالخادم حالياً." });
+      }
 
-      if (!keyEntry) {
+      const normalizedCode = code.trim().toUpperCase();
+      const keyDocRef = doc(db, "activation_keys", normalizedCode);
+      const keyDocSnap = await getDoc(keyDocRef);
+
+      if (!keyDocSnap.exists()) {
         return res.status(400).json({ success: false, message: "كود التفعيل غير صالح." });
       }
 
-      const backupKey = email ? `${normalizedCode}_${email.trim().toLowerCase()}` : normalizedCode;
-      const backups = dbData.backups?.[backupKey] || [];
+      const backupKeyEmail = email ? email.trim().toLowerCase() : "";
+      const backupsColl = collection(db, "cloud_backups");
+      const q = query(
+        backupsColl,
+        where("code", "==", normalizedCode),
+        where("email", "==", backupKeyEmail)
+      );
+
+      const snapshot = await getDocs(q);
+      const backups: any[] = [];
+      snapshot.forEach((docSnap) => {
+        const d = docSnap.data();
+        backups.push({
+          id: d.id,
+          timestamp: d.timestamp,
+          trigger: d.trigger,
+          benefitsCount: d.benefitsCount,
+          queriesCount: d.queriesCount,
+          data: d.data
+        });
+      });
+
+      // Sort in descending order
+      backups.sort((a, b) => b.timestamp - a.timestamp);
+
       return res.json({ success: true, backups });
     } catch (error) {
       console.error("List cloud backups error:", error);
@@ -437,26 +683,29 @@ async function startServer() {
   });
 
   // API Route: Delete Cloud Backup
-  app.post("/api/backup/delete", (req, res) => {
+  app.post("/api/backup/delete", async (req, res) => {
     try {
       const { code, email, backupId } = req.body;
       if (!code || !backupId) {
         return res.status(400).json({ success: false, message: "كود التفعيل ومعرّف النسخة مطلوبان." });
       }
 
-      const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
-      const normalizedCode = code.trim().toUpperCase();
-      const keyEntry = dbData.keys[normalizedCode];
+      if (!db) {
+        return res.status(500).json({ success: false, message: "قاعدة البيانات غير متصلة بالخادم حالياً." });
+      }
 
-      if (!keyEntry) {
+      const normalizedCode = code.trim().toUpperCase();
+      const keyDocRef = doc(db, "activation_keys", normalizedCode);
+      const keyDocSnap = await getDoc(keyDocRef);
+
+      if (!keyDocSnap.exists()) {
         return res.status(400).json({ success: false, message: "كود التفعيل غير صالح." });
       }
 
-      const backupKey = email ? `${normalizedCode}_${email.trim().toLowerCase()}` : normalizedCode;
-
-      if (dbData.backups && dbData.backups[backupKey]) {
-        dbData.backups[backupKey] = dbData.backups[backupKey].filter((b: any) => b.id !== backupId);
-        fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2), 'utf-8');
+      const backupDocRef = doc(db, "cloud_backups", backupId);
+      const backupSnap = await getDoc(backupDocRef);
+      if (backupSnap.exists()) {
+        await deleteDoc(backupDocRef);
       }
 
       return res.json({ success: true, message: "تم حذف النسخة الاحتياطية السحابية بنجاح." });

@@ -418,12 +418,6 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' }
       })
       .then(res => res.json())
-      .then(data => {
-        if (data.success && data.stats) {
-          localStorage.setItem('abuosid_local_visitors_count', String(data.stats.totalVisitors));
-          localStorage.setItem('abuosid_local_subscribers_count', String(data.stats.totalSubscribers));
-        }
-      })
       .catch(err => console.error('[جامع الفوائد] خطأ في تسجيل زيارة جديدة:', err));
     }
   }, []);
