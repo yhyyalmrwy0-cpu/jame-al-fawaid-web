@@ -1,34 +1,35 @@
 import { initializeApp } from "firebase/app";
-import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  getDocs, 
-  query, 
-  where, 
-  deleteDoc, 
-  doc, 
-  setDoc, 
-  orderBy, 
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where,
+  deleteDoc,
+  doc,
+  setDoc,
+  orderBy,
   limit,
-  Timestamp 
+  Timestamp
 } from "firebase/firestore";
 
-// Firebase Configuration from firebase-applet-config.json
+// Firebase Configuration for جامع الفوائد
 const firebaseConfig = {
-  apiKey: "AIzaSyDlUkuAywTTWCPAZZ0xMcVEmD3wCQsMu_0",
-  authDomain: "silken-being-x2t1j.firebaseapp.com",
-  projectId: "silken-being-x2t1j",
-  storageBucket: "silken-being-x2t1j.firebasestorage.app",
-  messagingSenderId: "808282091165",
-  appId: "1:808282091165:web:c7790bbdc985bb4c9fee74"
+  apiKey: "AIzaSyDPCFiO6_QL3jnwIL8_6MxHvCJSCOwwd1k",
+  authDomain: "jame-al-fawaid.firebaseapp.com",
+  databaseURL: "https://jame-al-fawaid-default-rtdb.firebaseio.com",
+  projectId: "jame-al-fawaid",
+  storageBucket: "jame-al-fawaid.appspot.com",
+  messagingSenderId: "259362855839",
+  appId: "1:259362855839:web:a475f4edade78b9707fbaa"
 };
 
 // Initialize Firebase App
 const app = initializeApp(firebaseConfig);
 
 // Initialize Firestore with the specific custom database ID
-export const db = getFirestore(app, "ai-studio-remix-e036a879-8e87-4762-b7b9-e2b68e5e4e8c");
+export const db = getFirestore(app);
 
 export interface FirebaseBackup {
   id: string;
@@ -43,8 +44,8 @@ export interface FirebaseBackup {
 }
 
 /**
- * Save backup data to Firebase Firestore
- */
+* Save backup data to Firebase Firestore
+*/
 export const saveBackupToFirebase = async (
   code: string,
   email: string,
@@ -52,7 +53,7 @@ export const saveBackupToFirebase = async (
 ): Promise<FirebaseBackup> => {
   const normalizedCode = code.trim().toUpperCase();
   const backupId = `firebase-${Date.now()}`;
-  
+ 
   const backupDoc: Omit<FirebaseBackup, "createdAt"> & { createdAt: Timestamp } = {
     id: backupId,
     timestamp: Date.now(),
@@ -64,10 +65,9 @@ export const saveBackupToFirebase = async (
     email: email ? email.trim().toLowerCase() : "",
     createdAt: Timestamp.now()
   };
-
   const docRef = doc(db, "backups", backupId);
   await setDoc(docRef, backupDoc);
-  
+ 
   return {
     ...backupDoc,
     createdAt: backupDoc.createdAt.toMillis()
@@ -75,24 +75,23 @@ export const saveBackupToFirebase = async (
 };
 
 /**
- * List backups from Firebase Firestore filtered by Code and optional Email
- */
+* List backups from Firebase Firestore filtered by Code and optional Email
+*/
 export const listBackupsFromFirebase = async (
   code: string,
   email?: string
 ): Promise<any[]> => {
   const normalizedCode = code.trim().toUpperCase();
   const backupsColl = collection(db, "backups");
-  
+ 
   let q = query(
-    backupsColl, 
+    backupsColl,
     where("code", "==", normalizedCode),
     orderBy("timestamp", "desc")
   );
-
   const querySnapshot = await getDocs(q);
   const backups: any[] = [];
-  
+ 
   querySnapshot.forEach((docSnap) => {
     const data = docSnap.data();
     // Filter by email if provided
@@ -110,13 +109,12 @@ export const listBackupsFromFirebase = async (
       isFirebase: true
     });
   });
-
   return backups;
 };
 
 /**
- * Delete a backup from Firebase Firestore
- */
+* Delete a backup from Firebase Firestore
+*/
 export const deleteBackupFromFirebase = async (backupId: string): Promise<void> => {
   const docRef = doc(db, "backups", backupId);
   await deleteDoc(docRef);
