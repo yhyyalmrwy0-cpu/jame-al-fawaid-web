@@ -157,7 +157,7 @@ async function startServer() {
 
       const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
       const normalizedCode = code.trim().toUpperCase();
-      const keyEntry = dbData.keys[normalizedCode];
+      let keyEntry = dbData.keys[normalizedCode];
 
       if (!keyEntry) {
         return res.status(400).json({ success: false, message: "مفتاح التفعيل هذا غير صحيح أو غير موجود." });
@@ -353,7 +353,7 @@ async function startServer() {
   // API Route: Save Cloud Backup
   app.post("/api/backup/save", (req, res) => {
     try {
-      const { code, backupData } = req.body;
+      const { code, email, backupData } = req.body;
       if (!code) {
         return res.status(400).json({ success: false, message: "يرجى تزويد كود التفعيل لحفظ النسخة السحابية." });
       }
@@ -370,8 +370,10 @@ async function startServer() {
         dbData.backups = {};
       }
 
-      if (!dbData.backups[normalizedCode]) {
-        dbData.backups[normalizedCode] = [];
+      const backupKey = email ? `${normalizedCode}_${email.trim().toLowerCase()}` : normalizedCode;
+
+      if (!dbData.backups[backupKey]) {
+        dbData.backups[backupKey] = [];
       }
 
       const newBackup = {
@@ -383,8 +385,8 @@ async function startServer() {
         data: backupData.data // stringified JSON
       };
 
-      dbData.backups[normalizedCode].unshift(newBackup);
-      dbData.backups[normalizedCode] = dbData.backups[normalizedCode].slice(0, 10); // store up to 10 backups
+      dbData.backups[backupKey].unshift(newBackup);
+      dbData.backups[backupKey] = dbData.backups[backupKey].slice(0, 10); // store up to 10 backups
 
       fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2), 'utf-8');
 
@@ -398,7 +400,7 @@ async function startServer() {
   // API Route: List Cloud Backups
   app.post("/api/backup/list", (req, res) => {
     try {
-      const { code } = req.body;
+      const { code, email } = req.body;
       if (!code) {
         return res.status(400).json({ success: false, message: "كود التفعيل مطلوب." });
       }
@@ -411,7 +413,8 @@ async function startServer() {
         return res.status(400).json({ success: false, message: "كود التفعيل غير صالح." });
       }
 
-      const backups = dbData.backups?.[normalizedCode] || [];
+      const backupKey = email ? `${normalizedCode}_${email.trim().toLowerCase()}` : normalizedCode;
+      const backups = dbData.backups?.[backupKey] || [];
       return res.json({ success: true, backups });
     } catch (error) {
       console.error("List cloud backups error:", error);
@@ -422,7 +425,7 @@ async function startServer() {
   // API Route: Delete Cloud Backup
   app.post("/api/backup/delete", (req, res) => {
     try {
-      const { code, backupId } = req.body;
+      const { code, email, backupId } = req.body;
       if (!code || !backupId) {
         return res.status(400).json({ success: false, message: "كود التفعيل ومعرّف النسخة مطلوبان." });
       }
@@ -435,8 +438,10 @@ async function startServer() {
         return res.status(400).json({ success: false, message: "كود التفعيل غير صالح." });
       }
 
-      if (dbData.backups && dbData.backups[normalizedCode]) {
-        dbData.backups[normalizedCode] = dbData.backups[normalizedCode].filter((b: any) => b.id !== backupId);
+      const backupKey = email ? `${normalizedCode}_${email.trim().toLowerCase()}` : normalizedCode;
+
+      if (dbData.backups && dbData.backups[backupKey]) {
+        dbData.backups[backupKey] = dbData.backups[backupKey].filter((b: any) => b.id !== backupId);
         fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2), 'utf-8');
       }
 
@@ -451,54 +456,62 @@ async function startServer() {
   // GOOGLE DRIVE OAUTH ENPOINTS FOR BACKUPS
   // ==========================================
 
+  const getRedirectUri = (req: any) => {
+    const forwardedProto = req.headers["x-forwarded-proto"];
+    const forwardedHost = req.headers["x-forwarded-host"] || req.headers.host;
+    if (forwardedProto && forwardedHost) {
+      return `${forwardedProto}://${forwardedHost}/auth/callback`;
+    }
+    const appUrl = process.env.APP_URL || "http://localhost:3000";
+    return `${appUrl.replace(/\/$/, "")}/auth/callback`;
+  };
+
   // Endpoint to fetch the Google authorization URL
   app.get("/api/auth/google/url", (req, res) => {
     try {
       const clientId = process.env.CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
-      const appUrl = process.env.APP_URL || "http://localhost:3000";
-      const redirectUri = `${appUrl.replace(/\/$/, "")}/auth/callback`;
-
-      if (!clientId) {
-        console.error("Google Client ID is missing from environment.");
-        return res.status(500).json({ 
-          success: false, 
-          message: "رمز تطبيق جوجل غير مبرمج في السيرفر. يرجى تزويد CLIENT_ID." 
-        });
-      }
-
-      const params = new URLSearchParams({
-        client_id: clientId,
-        redirect_uri: redirectUri,
-        response_type: "code",
-        scope: "https://www.googleapis.com/auth/drive.file openid email profile",
-        access_type: "offline",
-        prompt: "consent",
-      });
-
-      const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-      return res.json({ success: true, url });
-    } catch (err: any) {
-      console.error("Error generating auth url:", err);
-      return res.status(500).json({ success: false, message: "فشل في توليد رابط تسجيل الدخول." });
-    }
-  });
-
-  // Redirect callback handler for Google authentication
-  app.get(["/auth/callback", "/auth/callback/"], async (req, res) => {
-    const { code } = req.query;
-    if (!code) {
-      return res.status(400).send("الكود غير متوفر أو منتهي الصلاحية.");
-    }
-
-    const clientId = process.env.CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET;
-    const appUrl = process.env.APP_URL || "http://localhost:3000";
-    const redirectUri = `${appUrl.replace(/\/$/, "")}/auth/callback`;
-
-    if (!clientId || !clientSecret) {
-      console.error("Google client secrets are missing.");
-      return res.status(500).send("إعدادات جوجل غير متوفرة على السيرفر (CLIENT_ID / CLIENT_SECRET)");
-    }
+      const redirectUri = getRedirectUri(req);
+ 
+       if (!clientId) {
+         console.error("Google Client ID is missing from environment.");
+         return res.status(500).json({ 
+           success: false, 
+           message: "رمز تطبيق جوجل غير مبرمج في السيرفر. يرجى تزويد CLIENT_ID." 
+         });
+       }
+ 
+       const params = new URLSearchParams({
+         client_id: clientId,
+         redirect_uri: redirectUri,
+         response_type: "code",
+         scope: "https://www.googleapis.com/auth/drive.file openid email profile",
+         access_type: "offline",
+         prompt: "consent",
+       });
+ 
+       const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+       return res.json({ success: true, url });
+     } catch (err: any) {
+       console.error("Error generating auth url:", err);
+       return res.status(500).json({ success: false, message: "فشل في توليد رابط تسجيل الدخول." });
+     }
+   });
+ 
+   // Redirect callback handler for Google authentication
+   app.get(["/auth/callback", "/auth/callback/"], async (req, res) => {
+     const { code } = req.query;
+     if (!code) {
+       return res.status(400).send("الكود غير متوفر أو منتهي الصلاحية.");
+     }
+ 
+     const clientId = process.env.CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+     const clientSecret = process.env.CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET;
+     const redirectUri = getRedirectUri(req);
+ 
+     if (!clientId || !clientSecret) {
+       console.error("Google client secrets are missing.");
+       return res.status(500).send("إعدادات جوجل غير متوفرة على السيرفر (CLIENT_ID / CLIENT_SECRET)");
+     }
 
     try {
       const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -519,6 +532,23 @@ async function startServer() {
       if (!tokenResponse.ok) {
         console.error("OAuth token exchange failed:", tokens);
         return res.status(400).send(`فشل تبادل كود التسجيل: ${JSON.stringify(tokens)}`);
+      }
+
+      let email = null;
+      let name = null;
+      try {
+        const userinfoResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+          headers: {
+            Authorization: `Bearer ${tokens.access_token}`
+          }
+        });
+        if (userinfoResponse.ok) {
+          const userinfo: any = await userinfoResponse.json();
+          email = userinfo.email;
+          name = userinfo.name;
+        }
+      } catch (err) {
+        console.error("Failed to fetch Google user info:", err);
       }
 
       // Return a complete HTML with postMessage and self-close
@@ -563,7 +593,9 @@ async function startServer() {
                 window.opener.postMessage({ 
                   type: 'OAUTH_AUTH_SUCCESS', 
                   accessToken: ${JSON.stringify(tokens.access_token)},
-                  refreshToken: ${JSON.stringify(tokens.refresh_token || null)}
+                  refreshToken: ${JSON.stringify(tokens.refresh_token || null)},
+                  email: ${JSON.stringify(email)},
+                  name: ${JSON.stringify(name)}
                 }, '*');
                 setTimeout(() => {
                   window.close();

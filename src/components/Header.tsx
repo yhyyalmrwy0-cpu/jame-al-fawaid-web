@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BookOpen, RefreshCw, Trophy, Sparkles, Copy, Check, PenLine, X } from 'lucide-react';
 import { Benefit, AppSettings } from '../types';
-
-// @ts-ignore
-import scholarlyAppIcon from '../assets/images/app_logo_scholar_improved_1783056767417.jpg';
+import { AppLogo } from './AppLogo';
 
 interface HeaderProps {
   totalBenefits: number;
@@ -76,14 +74,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Top Banner and Counter */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-gradient-to-l from-brand-emerald-dark to-brand-emerald p-6 rounded-2xl text-white border border-brand-gold/20 custom-shadow">
         <div className="flex items-center gap-4 text-center sm:text-right">
-          <div className="w-14 h-14 rounded-2xl overflow-hidden border border-white/20 flex items-center justify-center shrink-0 shadow-inner">
-            <img
-              src={scholarlyAppIcon}
-              alt="شعار جامع الفوائد"
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <AppLogo className="w-14 h-14 shrink-0" />
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold font-sans tracking-tight text-brand-cream flex items-center gap-2 justify-center sm:justify-start">
               جامع الفوائد

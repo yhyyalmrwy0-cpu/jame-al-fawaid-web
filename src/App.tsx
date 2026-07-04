@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { BookOpen, HelpCircle, FolderSync, PlusCircle, Search, Heart, SlidersHorizontal, Grid, Star, Sparkles, Layers, Eye } from 'lucide-react';
+import { BookOpen, HelpCircle, FolderSync, PlusCircle, Search, Heart, SlidersHorizontal, Grid, Star, Sparkles, Layers, Eye, ArrowUp } from 'lucide-react';
 
 // Import Types
 import { Benefit, ScientificQuery, AppSettings, CATEGORIES, CategoryType } from './types';
@@ -13,11 +13,9 @@ import { QueryManager } from './components/QueryManager';
 import { SettingsPanel } from './components/SettingsPanel';
 import { NotificationToast, AndroidSystemNotification } from './components/NotificationCenter';
 import { uploadToGoogleDrive } from './utils/googleDrive';
+import { saveBackupToFirebase } from './lib/firebase';
 import { ShareCardModal } from './components/ShareCardModal';
 import { PremiumPromoModal } from './components/PremiumPromoModal';
-
-// @ts-ignore
-import scholarlyAppIcon from './assets/images/app_logo_scholar_improved_1783056767417.jpg';
 
 // Initial Starter Data for visual polish and immediate functionality on load
 const STARTER_BENEFITS: Benefit[] = [
@@ -93,6 +91,29 @@ export default function App() {
   // Navigation tabs state
   const [activeTab, setActiveTab] = useState<'home' | 'add' | 'queries' | 'settings'>('home');
 
+  // Back to top button visibility state
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 300) {
+        setShowScrollTop(true);
+      } else {
+        setShowScrollTop(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    });
+  };
+
   // Premium and Card Share Modal States
   const [showPremiumPromo, setShowPremiumPromo] = useState(false);
   const [sharingBenefit, setSharingBenefit] = useState<Benefit | null>(null);
@@ -152,7 +173,11 @@ export default function App() {
         return;
       }
 
-      const backupData = JSON.stringify({ benefits, queries });
+      const backupData = JSON.stringify({
+        benefits,
+        queries,
+        programmerName: settings.programmerName
+      });
       const now = Date.now();
 
       // Load current history
@@ -223,10 +248,28 @@ export default function App() {
             });
         }
 
-        // Save to fallback custom server if key is available
+        // Save to Firebase Cloud Backup (Durable and serverless-friendly!)
         if (isAppActivated()) {
           const key = localStorage.getItem('abuosid_activation_key') || '';
           if (key) {
+            const email = localStorage.getItem('abuosid_user_email') || '';
+            saveBackupToFirebase(key, email, {
+              trigger: triggerType,
+              benefitsCount: benefits.length,
+              queriesCount: queries.length,
+              data: backupData
+            })
+            .then(() => {
+              console.log('[جامع الفوائد] تم حفظ النسخة الاحتياطية السحابية عبر Firebase بنجاح.');
+              if (!googleToken) {
+                showToast('تم رفع وتحديث النسخة الاحتياطية تلقائياً إلى سحابة Firebase بنجاح! ☁️✅', 'success');
+              }
+            })
+            .catch(err => {
+              console.error('[جامع الفوائد] خطأ أثناء حفظ النسخة الاحتياطية السحابية لـ Firebase:', err);
+            });
+
+            // Mirror on custom server as secondary fallback
             fetch('/api/backup/save', {
               method: 'POST',
               headers: {
@@ -234,6 +277,7 @@ export default function App() {
               },
               body: JSON.stringify({
                 code: key,
+                email,
                 backupData: {
                   trigger: triggerType,
                   benefitsCount: benefits.length,
@@ -242,19 +286,8 @@ export default function App() {
                 }
               })
             })
-            .then(res => res.json())
-            .then(data => {
-              if (data.success) {
-                console.log('[جامع الفوائد] تم حفظ النسخة الاحتياطية السحابية الاحتياطية بنجاح.');
-                if (!googleToken) {
-                  showToast('تم رفع وتحديث النسخة الاحتياطية تلقائياً إلى السيرفر السحابي الآمن بنجاح! ☁️✅', 'success');
-                }
-              } else {
-                console.warn('[جامع الفوائد] فشل حفظ النسخة السحابية الاحتياطية:', data.message);
-              }
-            })
             .catch(err => {
-              console.error('[جامع الفوائد] خطأ اتصال بالخادم لحفظ النسخة السحابية الاحتياطية:', err);
+              console.warn('[جامع الفوائد] خطأ اتصال بالخادم الثانوي للنسخ الاحتياطي (متوقع على Vercel):', err);
             });
           }
         }
@@ -325,7 +358,11 @@ export default function App() {
 
       if (settings.autoBackupInterval === 'on_exit') {
         try {
-          const backupData = JSON.stringify({ benefits, queries });
+          const backupData = JSON.stringify({
+            benefits,
+            queries,
+            programmerName: settings.programmerName
+          });
           const existingHistoryStr = localStorage.getItem('abuosid_backups_history');
           let history = existingHistoryStr ? JSON.parse(existingHistoryStr) : [];
 
@@ -433,7 +470,7 @@ export default function App() {
         try {
           const notification = new Notification('💡 فائدة من جامع الفوائد تهمك', {
             body: `[${selectedBenefit.title}]\n${selectedBenefit.content.replace(/\n/g, ' ').substring(0, 110)}...`,
-            icon: scholarlyAppIcon,
+            icon: '/app_logo.svg',
             dir: 'rtl',
             lang: 'ar',
           });
@@ -544,7 +581,7 @@ export default function App() {
     showToast('تم حفظ تفضيلات الضبط والتنبيهات بنجاح.', 'success');
   };
 
-  const handleImportData = (importedData: { benefits: Benefit[]; queries: ScientificQuery[] }) => {
+  const handleImportData = (importedData: { benefits: Benefit[]; queries: ScientificQuery[]; programmerName?: string }) => {
     // Merge data avoiding duplicates
     setBenefits(prev => {
       const existingIds = new Set(prev.map(b => b.id));
@@ -557,6 +594,13 @@ export default function App() {
       const filteredImported = importedData.queries.filter(q => !existingIds.has(q.id));
       return [...filteredImported, ...prev];
     });
+
+    if (importedData.programmerName) {
+      handleUpdateSettings({
+        ...settings,
+        programmerName: importedData.programmerName
+      });
+    }
   };
 
   const handleRestoreBackup = (backupDataStr: string) => {
@@ -565,6 +609,14 @@ export default function App() {
       if (parsed && (Array.isArray(parsed.benefits) || Array.isArray(parsed.queries))) {
         setBenefits(parsed.benefits || []);
         setQueries(parsed.queries || []);
+        
+        if (parsed.programmerName) {
+          handleUpdateSettings({
+            ...settings,
+            programmerName: parsed.programmerName
+          });
+        }
+        
         showToast('تم استرجاع النسخة الاحتياطية وتحديث السجلات بنجاح!', 'success');
         return true;
       }
@@ -941,6 +993,26 @@ export default function App() {
         onClose={() => setShowPremiumPromo(false)}
         showToast={showToast}
       />
+
+      {/* Floating Back to Top Button */}
+      <AnimatePresence>
+        {showScrollTop && (
+          <motion.button
+            key="scroll-to-top"
+            initial={{ opacity: 0, scale: 0.8, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: 10 }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={scrollToTop}
+            className="fixed bottom-24 left-6 z-40 bg-brand-emerald hover:bg-brand-emerald-light text-white p-3.5 rounded-full shadow-lg border border-brand-emerald/10 cursor-pointer flex items-center justify-center transition-colors focus:outline-none"
+            title="الرجوع للأعلى"
+            aria-label="الرجوع للأعلى"
+          >
+            <ArrowUp className="w-5 h-5" />
+          </motion.button>
+        )}
+      </AnimatePresence>
 
     </div>
   );

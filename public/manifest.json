@@ -3,9 +3,9 @@
   "name": "جامع الفوائد - لتقييد وتحقيق الفوائد العلمية",
   "icons": [
     {
-      "src": "/app_logo.jpg",
+      "src": "/app_logo.svg",
       "sizes": "192x192 512x512",
-      "type": "image/jpeg",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ],
