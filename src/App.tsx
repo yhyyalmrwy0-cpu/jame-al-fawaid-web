@@ -16,6 +16,7 @@ import { uploadToGoogleDrive } from './utils/googleDrive';
 import { saveBackupToFirebase } from './lib/firebase';
 import { ShareCardModal } from './components/ShareCardModal';
 import { PremiumPromoModal } from './components/PremiumPromoModal';
+import { getApiUrl } from './utils/api';
 
 // Initial Starter Data for visual polish and immediate functionality on load
 const STARTER_BENEFITS: Benefit[] = [
@@ -270,7 +271,7 @@ export default function App() {
             });
 
             // Mirror on custom server as secondary fallback
-            fetch('/api/backup/save', {
+            fetch(getApiUrl('/api/backup/save'), {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -412,7 +413,7 @@ export default function App() {
     const visitRegistered = sessionStorage.getItem('abuosid_visit_registered');
     if (!visitRegistered) {
       sessionStorage.setItem('abuosid_visit_registered', 'true');
-      fetch('/api/stats/visit', {
+      fetch(getApiUrl('/api/stats/visit'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       })

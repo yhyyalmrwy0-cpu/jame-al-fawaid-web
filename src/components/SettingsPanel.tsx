@@ -15,6 +15,7 @@ import {
   deleteBackupFromFirebase
 } from '../lib/firebase';
 import { AppLogo } from './AppLogo';
+import { getApiUrl } from '../utils/api';
 
 interface SettingsPanelProps {
   settings: AppSettings;
@@ -213,7 +214,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       console.error('Error listing Firebase backups, falling back to local server:', err);
       // Fallback to local server backup if any error
       try {
-        const response = await fetch('/api/backup/list', {
+        const response = await fetch(getApiUrl('/api/backup/list'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -241,7 +242,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         pendingBackupAfterLoginRef.current = false;
       }
       showToast('جاري تحضير الاتصال الآمن مع جوجل...', 'info');
-      const res = await fetch('/api/auth/google/url');
+      const res = await fetch(getApiUrl('/api/auth/google/url'));
       let data;
       try {
         data = await res.json();
@@ -342,7 +343,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
 
     try {
-      const response = await fetch('/api/admin/keys', {
+      const response = await fetch(getApiUrl('/api/admin/keys'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -371,7 +372,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const handleGenerateKey = async () => {
     setIsGeneratingKey(true);
     try {
-      const response = await fetch('/api/admin/generate-key', {
+      const response = await fetch(getApiUrl('/api/admin/generate-key'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -388,7 +389,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         showToast(`تم توليد مفتاح تفعيل جديد بنجاح: ${data.key}`, 'success');
         setNewKeyNote('');
         // Refresh key list
-        const listResponse = await fetch('/api/admin/keys', {
+        const listResponse = await fetch(getApiUrl('/api/admin/keys'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -417,7 +418,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     requestConfirm('تأكيد الحذف 🗑️', 'هل أنت متأكد من رغبتك في حذف هذا المفتاح نهائياً؟', async () => {
       setIsDeletingKey(keyToDelete);
       try {
-        const response = await fetch('/api/admin/delete-key', {
+        const response = await fetch(getApiUrl('/api/admin/delete-key'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -433,7 +434,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         if (response.ok && data.success) {
           showToast('تم حذف مفتاح التفعيل بنجاح من قاعدة البيانات.', 'success');
           // Refresh key list
-          const listResponse = await fetch('/api/admin/keys', {
+          const listResponse = await fetch(getApiUrl('/api/admin/keys'), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -462,7 +463,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const handleResetKeys = async () => {
     requestConfirm('تأكيد إعادة التهيئة ⚠️', 'تنبيه هام جداً: هل أنت متأكد من إعادة تهيئة قاعدة البيانات؟ سيتم حذف كافة الرموز المولدة حديثاً واستعادة الرموز الافتراضية.', async () => {
       try {
-        const response = await fetch('/api/admin/reset-keys', {
+        const response = await fetch(getApiUrl('/api/admin/reset-keys'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -475,7 +476,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         if (response.ok && data.success) {
           showToast('تمت إعادة تهيئة قاعدة البيانات للمفاتيح بنجاح.', 'success');
           // Refresh key list
-          const listResponse = await fetch('/api/admin/keys', {
+          const listResponse = await fetch(getApiUrl('/api/admin/keys'), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -507,7 +508,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
     setIsChangingPassword(true);
     try {
-      const response = await fetch('/api/admin/change-password', {
+      const response = await fetch(getApiUrl('/api/admin/change-password'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -548,7 +549,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     let localMessage = '';
 
     try {
-      const response = await fetch('/api/activate', {
+      const response = await fetch(getApiUrl('/api/activate'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -694,7 +695,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
       // Best effort to mirror on the server
       try {
-        await fetch('/api/backup/save', {
+        await fetch(getApiUrl('/api/backup/save'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1603,7 +1604,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                                 const key = localStorage.getItem('abuosid_activation_key') || '';
                                 if (!key) return;
                                 try {
-                                  const response = await fetch('/api/backup/delete', {
+                                  const response = await fetch(getApiUrl('/api/backup/delete'), {
                                     method: 'POST',
                                     headers: {
                                       'Content-Type': 'application/json',

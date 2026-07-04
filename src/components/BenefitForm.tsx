@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Save, Mic, MicOff, BookOpen, Tag, Calendar, Sparkles, RefreshCw, Layers, Camera, Loader2, Image } from 'lucide-react';
 import { Benefit, CATEGORIES, CategoryType } from '../types';
 import { PremiumPromoModal } from './PremiumPromoModal';
+import { getApiUrl } from '../utils/api';
 
 interface BenefitFormProps {
   onSave: (benefit: Omit<Benefit, 'id' | 'views' | 'isFavorite' | 'createdAt'>) => void;
@@ -101,7 +102,7 @@ export const BenefitForm: React.FC<BenefitFormProps> = ({
       reader.onloadend = async () => {
         const base64String = reader.result as string;
         try {
-          const response = await fetch('/api/gemini/ocr', {
+          const response = await fetch(getApiUrl('/api/gemini/ocr'), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

@@ -1,3 +1,5 @@
+import { getApiUrl } from './api';
+
 /**
  * Helper to refresh Google OAuth token
  */
@@ -6,7 +8,7 @@ export const refreshGoogleAccessToken = async (): Promise<string | null> => {
   if (!refreshToken) return null;
 
   try {
-    const res = await fetch('/api/auth/google/refresh', {
+    const res = await fetch(getApiUrl('/api/auth/google/refresh'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken })
