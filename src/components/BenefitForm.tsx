@@ -5,7 +5,13 @@ import { Benefit, CATEGORIES, CategoryType } from '../types';
 import { PremiumPromoModal } from './PremiumPromoModal';
 import { getApiUrl } from '../utils/api';
 
-const compressImage = (file: File, maxWidth = 1600, maxHeight = 1600, quality = 0.85): Promise<string> => {
+const compressImage = (
+  file: File, 
+  maxWidth = 1200, 
+  maxHeight = 1200, 
+  quality = 0.80, 
+  maxSizeBytes = 1000000 // 1MB limit
+): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -29,22 +35,44 @@ const compressImage = (file: File, maxWidth = 1600, maxHeight = 1600, quality = 
           }
         }
 
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
+        const runCompression = (currentWidth: number, currentHeight: number, currentQuality: number, attempt = 1): string => {
+          const canvas = document.createElement('canvas');
+          canvas.width = currentWidth;
+          canvas.height = currentHeight;
 
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          console.warn('[القارئ الذكي] فشل إنشاء سياق 2D للوحة الرسم (Canvas)، سيتم استخدام الصورة الأصلية.');
-          resolve(event.target?.result as string);
-          return;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            console.warn('[القارئ الذكي] فشل إنشاء سياق 2D للوحة الرسم (Canvas)، سيتم استخدام الصورة الأصلية.');
+            return event.target?.result as string;
+          }
+
+          ctx.drawImage(img, 0, 0, currentWidth, currentHeight);
+
+          // Compress to JPEG for maximum compression
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', currentQuality);
+          
+          // Estimate size in bytes from Base64 string length
+          const estimatedSize = Math.round((compressedDataUrl.length * 3) / 4);
+          
+          if (estimatedSize > maxSizeBytes && attempt < 4) {
+            console.log(`[القارئ الذكي] المحاولة ${attempt}: الحجم ${Math.round(estimatedSize / 1024)} KB يتجاوز الحد المسموح (1MB). جاري تقليل الأبعاد والجودة...`);
+            return runCompression(
+              Math.round(currentWidth * 0.75),
+              Math.round(currentHeight * 0.75),
+              Math.max(0.4, currentQuality - 0.15),
+              attempt + 1
+            );
+          }
+          
+          return compressedDataUrl;
+        };
+
+        try {
+          const finalDataUrl = runCompression(width, height, quality);
+          resolve(finalDataUrl);
+        } catch (error) {
+          reject(error);
         }
-
-        ctx.drawImage(img, 0, 0, width, height);
-
-        // Compress to JPEG for maximum compression
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
-        resolve(compressedDataUrl);
       };
       img.onerror = (err) => {
         console.error('[القارئ الذكي] فشل تحميل الصورة للضغط:', err);
