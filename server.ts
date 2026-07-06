@@ -51,7 +51,7 @@ const PORT = 3000;
         return res.status(400).json({ success: false, message: "يرجى تزويد صورة لقراءتها واستخراج النص منها." });
       }
 
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = "AQ.Ab8RN6LJE0fdFXkGATaAxGLbqqr9DzPlj1muJTCFCc7eJ-7YTw";
       if (!apiKey) {
         return res.status(400).json({ 
           success: false, 
