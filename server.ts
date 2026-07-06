@@ -22,9 +22,8 @@ import {
   orderBy 
 } from "firebase/firestore";
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+const app = express();
+const PORT = 3000;
 
   // Set payload limits high enough to handle photographic page captures
   app.use(express.json({ limit: '50mb' }));
@@ -44,16 +43,6 @@ async function startServer() {
     next();
   });
 
-  // Initialize Gemini Client
-  const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      }
-    }
-  });
-
   // API Route: OCR and Text Extraction with Gemini
   app.post("/api/gemini/ocr", async (req, res) => {
     try {
@@ -62,9 +51,23 @@ async function startServer() {
         return res.status(400).json({ success: false, message: "يرجى تزويد صورة لقراءتها واستخراج النص منها." });
       }
 
-      if (!process.env.GEMINI_API_KEY) {
-        return res.status(500).json({ success: false, message: "مفتاح API الخاص بـ Gemini غير مضبوط على الخادم. يرجى تفعيله من الإعدادات." });
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "مفتاح الـ API الخاص بجيميناي مفقود في إعدادات السيرفر أو Vercel. يرجى إضافته إلى متغيرات البيئة (GEMINI_API_KEY) لتفعيل ميزة القارئ الذكي (OCR)." 
+        });
       }
+
+      // Initialize Gemini Client Lazily
+      const ai = new GoogleGenAI({
+        apiKey: apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
 
       let base64Data = image;
       let actualMimeType = mimeType || "image/jpeg";
@@ -950,11 +953,17 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
+    (async () => {
+      try {
+        const vite = await createViteServer({
+          server: { middlewareMode: true },
+          appType: "spa",
+        });
+        app.use(vite.middlewares);
+      } catch (e) {
+        console.error("Failed to initialize Vite development server:", e);
+      }
+    })();
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
@@ -963,9 +972,10 @@ async function startServer() {
     });
   }
 
+if (!process.env.VERCEL) {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }
 
-startServer();
+export default app;

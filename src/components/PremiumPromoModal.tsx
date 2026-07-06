@@ -27,10 +27,10 @@ export const PremiumPromoModal: React.FC<PremiumPromoModalProps> = ({
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="bg-white rounded-3xl max-w-lg w-full overflow-hidden text-right font-sans border-2 border-brand-gold/45 shadow-2xl relative"
+          className="bg-white rounded-3xl max-w-xl md:max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden text-right font-sans border-2 border-brand-gold/45 shadow-2xl relative"
         >
           {/* Header Accent Decorator */}
-          <div className="bg-gradient-to-l from-brand-emerald-dark via-brand-emerald to-brand-emerald-dark p-6 text-white relative">
+          <div className="bg-gradient-to-l from-brand-emerald-dark via-brand-emerald to-brand-emerald-dark p-6 text-white relative shrink-0">
             <button
               onClick={onClose}
               className="absolute top-4 left-4 p-1 rounded-full bg-black/20 hover:bg-black/30 transition-all text-white"
@@ -48,13 +48,13 @@ export const PremiumPromoModal: React.FC<PremiumPromoModalProps> = ({
             </div>
           </div>
 
-          <div className="p-6 space-y-6">
+          <div className="p-6 space-y-6 overflow-y-auto flex-1">
             <p className="text-xs text-zinc-600 leading-relaxed font-semibold">
               شكرًا لاهتمامك ببرنامج <span className="text-brand-emerald font-bold">جامع الفوائد</span>! الترقية للنسخة الاحترافية تدعم استمرار تطوير التطبيق وتفتح لك باقة من المزايا الحصرية المصممة لطلاب العلم والباحثين:
             </p>
 
             {/* Features List */}
-            <div className="space-y-4 max-h-[340px] overflow-y-auto pr-1">
+            <div className="space-y-4 pr-1">
               {/* Feature 1: OCR */}
               <div className="flex gap-3 items-start bg-brand-cream/15 p-3 rounded-2xl border border-brand-cream/30">
                 <div className="p-2 bg-brand-gold/15 text-brand-gold-dark rounded-xl shrink-0">
@@ -151,7 +151,7 @@ export const PremiumPromoModal: React.FC<PremiumPromoModalProps> = ({
             </div>
           </div>
           
-          <div className="bg-zinc-100 p-4 border-t border-zinc-200 text-left">
+          <div className="bg-zinc-100 p-4 border-t border-zinc-200 text-left shrink-0">
             <button
               type="button"
               onClick={onClose}

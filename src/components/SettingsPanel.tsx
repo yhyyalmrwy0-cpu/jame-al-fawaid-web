@@ -165,14 +165,22 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     "ABU-OSID-PREMIUM-4444"
   ]);
 
-  // One-time free PDF trial state
-  const [freePdfUsed, setFreePdfUsed] = useState<boolean>(() => {
+  // Two-times free PDF trial state
+  const [freePdfCount, setFreePdfCount] = useState<number>(() => {
     try {
-      return localStorage.getItem('abuosid_free_pdf_used') === 'true';
+      const countVal = localStorage.getItem('abuosid_free_pdf_count');
+      if (countVal !== null) {
+        return parseInt(countVal, 10) || 0;
+      }
+      // Backward compatibility check
+      const oldUsed = localStorage.getItem('abuosid_free_pdf_used') === 'true';
+      return oldUsed ? 1 : 0;
     } catch (e) {
-      return false;
+      return 0;
     }
   });
+
+  const freePdfUsed = freePdfCount >= 2;
 
   // Admin Panel states
   const [showAdminSection, setShowAdminSection] = useState(false);
@@ -1219,16 +1227,21 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <div className="text-xs text-brand-emerald-dark bg-emerald-50 p-3 rounded-lg border border-emerald-200 flex items-start gap-2">
                       <span className="text-lg">🎁</span>
                       <div className="space-y-0.5">
-                        <span className="font-black block">محاولة تجريبية مجانية واحدة متاحة!</span>
-                        <span>يمكنك تحميل وتصدير ملف الـ PDF لمرة واحدة <strong className="font-bold">مجاناً</strong> لتجربة جودة وأناقة الأغلفة والتنسيق التراثي قبل التفعيل.</span>
+                        <span className="font-black block">
+                          {freePdfCount === 0 ? 'محاولتان تجريبيتان مجانيتان متاحتان!' : 'محاولة تجريبية مجانية واحدة متبقية!'}
+                        </span>
+                        <span>
+                          يمكنك تحميل وتصدير ملف الـ PDF لـ <strong className="font-bold">مرتين مجاناً</strong> لتجربة جودة وأناقة الأغلفة والتنسيق التراثي قبل التفعيل.
+                          {freePdfCount === 1 && <span className="block mt-1 font-bold text-amber-700">(لقد استهلكت المحاولة الأولى، ولديك محاولة أخيرة متبقية)</span>}
+                        </span>
                       </div>
                     </div>
                   ) : (
                     <div className="text-xs text-rose-800 bg-rose-50 p-3 rounded-lg border border-rose-200 flex items-start gap-2">
                       <span className="text-lg">⚠️</span>
                       <div className="space-y-0.5">
-                        <span className="font-black block">انتهت المحاولة المجانية لمرة واحدة!</span>
-                        <span>لقد قمت بتحميل وتجربة التصدير مسبقاً. لاستئناف التصدير والتحميل المفتوح بجميع الأشكال والتحديثات المستقبلية، يرجى تفعيل رخصتك أدناه.</span>
+                        <span className="font-black block">انتهت المحاولتان المجانيتان!</span>
+                        <span>لقد قمت بتحميل وتجربة التصدير مرتين مسبقاً. لاستئناف التصدير والتحميل المفتوح بجميع الأشكال والتحديثات المستقبلية، يرجى تفعيل رخصتك أدناه.</span>
                       </div>
                     </div>
                   )}
@@ -1297,10 +1310,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-brand-gold/10">
               <div className="text-[10px] text-zinc-500 text-right">
                 {!isActivated && !freePdfUsed && (
-                  <span className="text-brand-emerald-dark font-bold">✨ سيتم استهلاك المحاولة التجريبية المجانية لمرة واحدة عند التحميل.</span>
+                  <span className="text-brand-emerald-dark font-bold">
+                    {freePdfCount === 0 
+                      ? '✨ لديك محاولتان مجانيتان. سيتم استهلاك المحاولة الأولى عند التحميل.' 
+                      : '✨ لديك محاولة واحدة متبقية. سيتم استهلاكها عند هذا التحميل.'}
+                  </span>
                 )}
                 {!isActivated && freePdfUsed && (
-                  <span className="text-rose-600 font-bold">❌ انتهت المحاولة المجانية. يرجى التفعيل للتحميل.</span>
+                  <span className="text-rose-600 font-bold">❌ انتهت المحاولات المجانية (مرتان). يرجى التفعيل للتحميل.</span>
                 )}
                 {isActivated && (
                   <span className="text-emerald-700 font-bold">🟢 التصدير نشط وغير محدود مدى الحياة.</span>
@@ -1316,7 +1333,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   }
 
                   if (!isActivated && freePdfUsed) {
-                    showToast('عذراً، لقد استنفدت محاولتك المجانية لمرة واحدة. يرجى تفعيل رخصة التصدير للاستخدام اللامحدود. 🔒', 'warning');
+                    showToast('عذراً، لقد استنفدت محاولتيك المجانيتين. يرجى تفعيل رخصة التصدير للاستخدام اللامحدود. 🔒', 'warning');
                     if (onShowPremiumPromo) onShowPremiumPromo();
                     return;
                   }
@@ -1326,9 +1343,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   
                   if (!isActivated && !freePdfUsed) {
                     // Consume the free trial
-                    localStorage.setItem('abuosid_free_pdf_used', 'true');
-                    setFreePdfUsed(true);
-                    showToast('تم تصدير ملف الـ PDF بنجاح واستهلاك المحاولة المجانية لمرة واحدة. للتصدير مجدداً يرجى التفعيل. 🎉', 'success');
+                    const newCount = freePdfCount + 1;
+                    localStorage.setItem('abuosid_free_pdf_count', String(newCount));
+                    localStorage.setItem('abuosid_free_pdf_used', newCount >= 2 ? 'true' : 'false');
+                    setFreePdfCount(newCount);
+                    
+                    if (newCount >= 2) {
+                      showToast('تم تصدير ملف الـ PDF بنجاح واستهلاك المحاولة المجانية الثانية والأخيرة. للتصدير مجدداً يرجى التفعيل. 🎉', 'success');
+                    } else {
+                      showToast('تم تصدير ملف الـ PDF بنجاح واستهلاك المحاولة المجانية الأولى. متبقي لك محاولة مجانية واحدة أخرى. 🎉', 'success');
+                    }
                   } else {
                     showToast('جاري تحضير ملف PDF وتوليده بنجاح للطباعة... 📥', 'success');
                   }

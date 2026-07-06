@@ -45,7 +45,7 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const textToShare = `📖 فائدة علمية من: [جامع الفوائد]\n\nالعنوان: ${benefit.title}\nالتصنيف: ${benefit.category}\nالمصدر: ${benefit.source || 'غير محدد'}\nالتاريخ: ${formatToHijriAndGregorian(benefit.date)}\n\nالنص:\n"${benefit.content}"`;
+    const textToShare = `📖 فائدة علمية من: [جامع الفوائد]\n\nالعنوان: ${benefit.title}\nالتصنيف: ${benefit.category}\nالمصدر: ${benefit.source || 'غير محدد'}\nالتاريخ: ${formatToHijriAndGregorian(benefit.date)}\n\nالنص:\n"${benefit.content}"\n\nتم النشر بواسطة تطبيق جامع الفوائد 📚\nhttps://jame-al-fawaid-kc2u.vercel.app`;
     
     navigator.clipboard.writeText(textToShare);
     setCopied(true);
@@ -55,7 +55,7 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
 
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const textToShare = `📖 فائدة علمية من: [جامع الفوائد]\n\nالعنوان: ${benefit.title}\nالتصنيف: ${benefit.category}\n\n"${benefit.content}"`;
+    const textToShare = `📖 فائدة علمية من: [جامع الفوائد]\n\nالعنوان: ${benefit.title}\nالتصنيف: ${benefit.category}\n\n"${benefit.content}"\n\nتم النشر بواسطة تطبيق جامع الفوائد 📚\nhttps://jame-al-fawaid-kc2u.vercel.app`;
 
     if (navigator.share) {
       try {
