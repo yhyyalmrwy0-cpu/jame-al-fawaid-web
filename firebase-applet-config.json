@@ -1,9 +1,9 @@
 {
-  "apiKey": "AIzaSyDPCFiO6_QL3jnwIL8_6MxHvCJSCOwwd1k",
+  "apiKey": "AIzaSyDPCFId6_QL3jnwiL8_6MrHvCJSC0wwdik",
   "authDomain": "jame-al-fawaid.firebaseapp.com",
   "databaseURL": "https://jame-al-fawaid-default-rtdb.firebaseio.com",
   "projectId": "jame-al-fawaid",
-  "storageBucket": "jame-al-fawaid.appspot.com",
+  "storageBucket": "jame-al-fawaid.firebasestorage.app",
   "messagingSenderId": "259362855839",
   "appId": "1:259362855839:web:a475f4edade78b9707fbaa"
 }

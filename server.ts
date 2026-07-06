@@ -4,6 +4,9 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { initializeApp } from "firebase/app";
+import dotenv from "dotenv";
+
+dotenv.config();
 import { 
   getFirestore, 
   collection, 
@@ -93,10 +96,12 @@ async function startServer() {
 
       const response = await ai.models.generateContent({
         model: "gemini-3.5-flash",
-        contents: [
-          imagePart,
-          { text: "الرجاء قراءة الصورة المرفقة واستخراج كامل النص العربي المكتوب فيها بدقة عالية." }
-        ],
+        contents: {
+          parts: [
+            imagePart,
+            { text: "الرجاء قراءة الصورة المرفقة واستخراج كامل النص العربي المكتوب فيها بدقة عالية." }
+          ]
+        },
         config: {
           systemInstruction,
           temperature: 0.1,
@@ -106,8 +111,17 @@ async function startServer() {
       const text = response.text || "";
       return res.json({ success: true, text });
     } catch (error: any) {
-      console.error("Gemini OCR Error:", error);
-      return res.status(500).json({ success: false, message: error.message || "فشل قراءة الصورة واستخراج النص عبر الذكاء الاصطناعي." });
+      console.error("خطأ السيرفر المحلي:", error);
+      console.error("Gemini OCR Error Detailed Log:", {
+        message: error.message,
+        stack: error.stack,
+        errorObject: error,
+        apiKeyPresent: !!process.env.GEMINI_API_KEY
+      });
+      return res.status(500).json({ 
+        success: false, 
+        message: error.message || "فشل قراءة الصورة واستخراج النص عبر الذكاء الاصطناعي." 
+      });
     }
   });
 
@@ -923,6 +937,15 @@ async function startServer() {
       console.error("Refresh token error:", error);
       return res.status(500).json({ success: false, message: "فشل تجديد مفتاح الولوج السحابي." });
     }
+  });
+
+  // Global JSON Error Handler to prevent Express crashing or sending HTML pages in development
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error("خطأ السيرفر المحلي (Global Error Handler):", err);
+    res.status(err.status || err.statusCode || 500).json({
+      success: false,
+      message: err.message || "حدث خطأ داخلي غير متوقع في الخادم المحلي."
+    });
   });
 
   // Vite middleware for development

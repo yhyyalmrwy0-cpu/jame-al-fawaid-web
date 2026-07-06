@@ -16,6 +16,7 @@ import { uploadToGoogleDrive } from './utils/googleDrive';
 import { saveBackupToFirebase } from './lib/firebase';
 import { ShareCardModal } from './components/ShareCardModal';
 import { PremiumPromoModal } from './components/PremiumPromoModal';
+import { WelcomeModal } from './components/WelcomeModal';
 import { getApiUrl } from './utils/api';
 
 // Initial Starter Data for visual polish and immediate functionality on load
@@ -117,7 +118,22 @@ export default function App() {
 
   // Premium and Card Share Modal States
   const [showPremiumPromo, setShowPremiumPromo] = useState(false);
+  const [showWelcome, setShowWelcome] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('abuosid_welcome_dismissed') !== 'true';
+    } catch (e) {
+      return false;
+    }
+  });
   const [sharingBenefit, setSharingBenefit] = useState<Benefit | null>(null);
+  const [expandedBenefitId, setExpandedBenefitId] = useState<string | null>(null);
+  const [isControlPanelVisible, setIsControlPanelVisible] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('abuosid_control_panel_visible') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
 
   // Core records state with localStorage loading
   const [benefits, setBenefits] = useState<Benefit[]>(() => {
@@ -143,10 +159,6 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed.programmerName === 'أبو أُسيد' || parsed.programmerName === 'أبو أسيد' || parsed.programmerName === 'أبي أُسيد' || parsed.programmerName === 'أبي أسيد') {
-          parsed.programmerName = 'طالب العلم';
-          localStorage.setItem('abuosid_settings', JSON.stringify(parsed));
-        }
         return { ...defaultSettings, ...parsed };
       } catch (e) {
         return defaultSettings;
@@ -542,6 +554,33 @@ export default function App() {
     setBenefits(prev => prev.map(b => b.id === id ? { ...b, views: b.views + 1 } : b));
   };
 
+  // Helper to scroll to a specific benefit, expand it, and highlight it
+  const handleScrollToBenefit = (b: Benefit) => {
+    // 1. Reset all filters to guarantee the card exists in the list
+    setSearchQuery('');
+    setSelectedCategory('الكل');
+    setOnlyFavorites(false);
+    
+    // 2. Set this benefit ID to be expanded
+    setExpandedBenefitId(b.id);
+    
+    // 3. Mark it as viewed (increment views count)
+    handleViewBenefit(b.id);
+    
+    // 4. Scroll smoothly to the card with high contrast highlight effect
+    setTimeout(() => {
+      const element = document.getElementById(`benefit-card-${b.id}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Add a temporary glow-highlight ring around the card
+        element.classList.add('ring-4', 'ring-brand-gold', 'scale-[1.02]', 'duration-500');
+        setTimeout(() => {
+          element.classList.remove('ring-4', 'ring-brand-gold', 'scale-[1.02]');
+        }, 2000);
+      }
+    }, 150);
+  };
+
   // 3. Toggle Favorite Status
   const handleToggleFavorite = (id: string) => {
     setBenefits(prev => prev.map(b => b.id === id ? { ...b, isFavorite: !b.isFavorite } : b));
@@ -574,6 +613,24 @@ export default function App() {
   const handleUpdateSettings = (newSettings: AppSettings) => {
     setSettings(newSettings);
     showToast('تم حفظ تفضيلات الضبط والتنبيهات بنجاح.', 'success');
+  };
+
+  const handleToggleControlPanel = () => {
+    setIsControlPanelVisible(prev => {
+      const newValue = !prev;
+      try {
+        localStorage.setItem('abuosid_control_panel_visible', String(newValue));
+      } catch (e) {
+        console.error(e);
+      }
+      
+      if (newValue) {
+        setActiveTab('settings');
+      } else {
+        setActiveTab('home');
+      }
+      return newValue;
+    });
   };
 
   const handleImportData = (importedData: { benefits: Benefit[]; queries: ScientificQuery[]; programmerName?: string }) => {
@@ -695,14 +752,11 @@ export default function App() {
               <Header
                 totalBenefits={benefits.length}
                 benefits={benefits}
-                onViewBenefit={(b) => {
-                  handleViewBenefit(b.id);
-                  // Filter strictly to view this card expanded
-                  setSearchQuery(b.title);
-                }}
+                onViewBenefit={handleScrollToBenefit}
                 showToast={showToast}
                 settings={settings}
                 onUpdateSettings={handleUpdateSettings}
+                onUnlockControlPanel={handleToggleControlPanel}
               />
 
               {/* Filtering Controls Panel */}
@@ -823,6 +877,7 @@ export default function App() {
                       onDelete={handleDeleteBenefit}
                       showToast={showToast}
                       onOpenShareCard={(b) => setSharingBenefit(b)}
+                      forceExpanded={expandedBenefitId === benefit.id}
                     />
                   ))
                 )}
@@ -887,6 +942,8 @@ export default function App() {
                 triggerTestNotification={triggerTestNotification}
                 showToast={showToast}
                 onShowPremiumPromo={() => setShowPremiumPromo(true)}
+                isControlPanelVisible={isControlPanelVisible}
+                onUnlockControlPanel={handleToggleControlPanel}
               />
             </motion.div>
           )}
@@ -987,6 +1044,20 @@ export default function App() {
         isOpen={showPremiumPromo}
         onClose={() => setShowPremiumPromo(false)}
         showToast={showToast}
+      />
+
+      {/* Welcome Modal Popup */}
+      <WelcomeModal
+        isOpen={showWelcome}
+        onClose={() => {
+          try {
+            localStorage.setItem('abuosid_welcome_dismissed', 'true');
+          } catch (e) {
+            console.error(e);
+          }
+          setShowWelcome(false);
+          showToast('أهلاً بك في جامع الفوائد! استمتع بتقييد فرائدك العلمية 📚✨', 'success');
+        }}
       />
 
       {/* Floating Back to Top Button */}

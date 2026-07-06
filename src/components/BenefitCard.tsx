@@ -12,6 +12,7 @@ interface BenefitCardProps {
   onDelete: (id: string) => void;
   showToast: (msg: string, type: 'success' | 'info' | 'warning') => void;
   onOpenShareCard: (benefit: Benefit) => void;
+  forceExpanded?: boolean;
 }
 
 export const BenefitCard: React.FC<BenefitCardProps> = ({
@@ -22,11 +23,18 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
   onDelete,
   showToast,
   onOpenShareCard,
+  forceExpanded,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
+
+  React.useEffect(() => {
+    if (forceExpanded) {
+      setIsExpanded(true);
+    }
+  }, [forceExpanded]);
 
   const handleCardClick = () => {
     if (!isExpanded) {
@@ -80,6 +88,7 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
     <>
       <motion.div
         layout
+        id={`benefit-card-${benefit.id}`}
         className={`bg-white rounded-2xl border border-zinc-200 cursor-pointer transition-all duration-300 custom-shadow hover:border-brand-cream text-right relative ${
           isExpanded ? 'border-brand-gold/40 ring-1 ring-brand-gold/15 !overflow-visible' : 'overflow-hidden'
         }`}

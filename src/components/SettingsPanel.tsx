@@ -28,6 +28,8 @@ interface SettingsPanelProps {
   triggerTestNotification: () => void;
   showToast: (msg: string, type: 'success' | 'info' | 'warning') => void;
   onShowPremiumPromo?: () => void;
+  isControlPanelVisible?: boolean;
+  onUnlockControlPanel?: () => void;
 }
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -41,10 +43,50 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   triggerTestNotification,
   showToast,
   onShowPremiumPromo,
+  isControlPanelVisible,
+  onUnlockControlPanel,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingBackupAfterLoginRef = useRef<boolean>(false);
   const handleCloudBackupRef = useRef<() => Promise<void>>(async () => {});
+
+  // Long press hold states for the developer profile block
+  const [isHoldingDeveloper, setIsHoldingDeveloper] = useState(false);
+  const developerTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const developerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const developerHoldStartTimeRef = useRef<number>(0);
+
+  // Clean up timers on unmount
+  React.useEffect(() => {
+    return () => {
+      if (developerTimerRef.current) clearTimeout(developerTimerRef.current);
+      if (developerIntervalRef.current) clearInterval(developerIntervalRef.current);
+    };
+  }, []);
+
+  const startHoldDeveloper = (e: React.MouseEvent | React.TouchEvent) => {
+    developerHoldStartTimeRef.current = Date.now();
+    setIsHoldingDeveloper(true);
+
+    if (developerTimerRef.current) clearTimeout(developerTimerRef.current);
+
+    developerTimerRef.current = setTimeout(() => {
+      setIsHoldingDeveloper(false);
+      developerTimerRef.current = null;
+
+      if (onUnlockControlPanel) {
+        onUnlockControlPanel();
+      }
+    }, 5000);
+  };
+
+  const cancelHoldDeveloper = (e: React.MouseEvent | React.TouchEvent) => {
+    if (isHoldingDeveloper) {
+      setIsHoldingDeveloper(false);
+      if (developerTimerRef.current) clearTimeout(developerTimerRef.current);
+      developerTimerRef.current = null;
+    }
+  };
   
   // Backups History local list
   const [backupsHistory, setBackupsHistory] = useState<any[]>(() => {
@@ -71,6 +113,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   // Custom PDF Export Options State
   const [pdfStyle, setPdfStyle] = useState<'grid' | 'book'>('grid');
+  const [pdfTheme, setPdfTheme] = useState<string>('emerald');
   const [pdfBookTitle, setPdfBookTitle] = useState('خِزانة الفوائد والفرائد العلمية');
   const [pdfAuthorName, setPdfAuthorName] = useState(settings.programmerName || 'طالب العلم الباحث');
   const [includeCover, setIncludeCover] = useState(true);
@@ -907,7 +950,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => setPdfStyle('grid')}
+                    onClick={() => {
+                      setPdfStyle('grid');
+                      setPdfTheme('emerald');
+                    }}
                     className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
                       pdfStyle === 'grid'
                         ? 'bg-brand-emerald text-white border-brand-emerald shadow-sm'
@@ -919,7 +965,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPdfStyle('book')}
+                    onClick={() => {
+                      setPdfStyle('book');
+                      setPdfTheme('heritage');
+                    }}
                     className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
                       pdfStyle === 'book'
                         ? 'bg-brand-emerald text-white border-brand-emerald shadow-sm'
@@ -950,6 +999,111 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 ) : (
                   <div className="text-xs text-zinc-500 bg-zinc-50 p-3 rounded-xl border border-zinc-150 leading-relaxed self-stretch">
                     ℹ️ يتم تقسيم الفوائد في جدول A4 يمنع تداخل الكلمات ويحافظ على جودة قراءة الخط عند الطباعة.
+                  </div>
+                )}
+              </div>
+
+              {/* Theme/Design selection */}
+              <div className="col-span-1 sm:col-span-2 space-y-2 text-right">
+                <label className="block text-xs font-bold text-zinc-700">
+                  🎨 اختر المظهر والتصميم الفني للتقرير أو الكتاب:
+                </label>
+                {pdfStyle === 'grid' ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPdfTheme('emerald')}
+                      className={`p-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                        pdfTheme === 'emerald'
+                          ? 'bg-brand-emerald text-white border-brand-emerald shadow-sm'
+                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                      }`}
+                    >
+                      <span className="text-base">🌿</span>
+                      <span className="font-bold">الزمردي التراثي</span>
+                      <span className="text-[9px] opacity-75 font-normal">أخضر كلاسيكي وذهبي</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPdfTheme('sapphire')}
+                      className={`p-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                        pdfTheme === 'sapphire'
+                          ? 'bg-brand-emerald text-white border-brand-emerald shadow-sm'
+                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                      }`}
+                    >
+                      <span className="text-base">🔹</span>
+                      <span className="font-bold">الياقوتي الملوكي</span>
+                      <span className="text-[9px] opacity-75 font-normal">أزرق ملكي وسماوي</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPdfTheme('ruby')}
+                      className={`p-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                        pdfTheme === 'ruby'
+                          ? 'bg-brand-emerald text-white border-brand-emerald shadow-sm'
+                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                      }`}
+                    >
+                      <span className="text-base">🌹</span>
+                      <span className="font-bold">العقيقي الأندلسي</span>
+                      <span className="text-[9px] opacity-75 font-normal">عقيقي فاخر ونحاسي</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPdfTheme('charcoal')}
+                      className={`p-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                        pdfTheme === 'charcoal'
+                          ? 'bg-brand-emerald text-white border-brand-emerald shadow-sm'
+                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                      }`}
+                    >
+                      <span className="text-base">🖤</span>
+                      <span className="font-bold">الجرانيتي العصري</span>
+                      <span className="text-[9px] opacity-75 font-normal">رمادي فحمي ونعناعي</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPdfTheme('heritage')}
+                      className={`p-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                        pdfTheme === 'heritage'
+                          ? 'bg-brand-emerald text-white border-brand-emerald shadow-sm'
+                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                      }`}
+                    >
+                      <span className="text-base">📜</span>
+                      <span className="font-bold">الأثري المذهب (تراثي)</span>
+                      <span className="text-[9px] opacity-75 font-normal">ورق معتق وإطار مذهب فخم</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPdfTheme('royal')}
+                      className={`p-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                        pdfTheme === 'royal'
+                          ? 'bg-brand-emerald text-white border-brand-emerald shadow-sm'
+                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                      }`}
+                    >
+                      <span className="text-base">👑</span>
+                      <span className="font-bold">الملكي الأرجواني الفاخر</span>
+                      <span className="text-[9px] opacity-75 font-normal">تطريز ذهبي وخلفية ملكية لافتة</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPdfTheme('minimal')}
+                      className={`p-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                        pdfTheme === 'minimal'
+                          ? 'bg-brand-emerald text-white border-brand-emerald shadow-sm'
+                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                      }`}
+                    >
+                      <span className="text-base">🖊️</span>
+                      <span className="font-bold">الحديث المعاصر (مبسط)</span>
+                      <span className="text-[9px] opacity-75 font-normal">ورق ناصع البياض وإطار مينيست</span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -1168,7 +1322,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   }
 
                   // Perform PDF Generation
-                  exportBenefitsToPDF(benefits, pdfStyle, pdfBookTitle, pdfAuthorName, settings.programmerEmail, includeCover, pdfCategorySelect);
+                  exportBenefitsToPDF(benefits, pdfStyle, pdfBookTitle, pdfAuthorName, settings.programmerEmail, includeCover, pdfCategorySelect, pdfTheme);
                   
                   if (!isActivated && !freePdfUsed) {
                     // Consume the free trial
@@ -1741,336 +1895,338 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       </div>
 
       {/* 3.5. Admin Key Management Control Panel */}
-      <div className="bg-white rounded-2xl border-2 border-brand-gold/20 p-5 custom-shadow space-y-4">
-        <button
-          type="button"
-          onClick={() => setShowAdminSection(!showAdminSection)}
-          className="w-full text-right flex items-center justify-between group cursor-pointer focus:outline-none"
-        >
-          <div className="space-y-1 text-right">
-            <h3 className="text-base font-bold text-brand-emerald-dark flex items-center gap-2">
-              <span className="p-1.5 bg-brand-gold/10 text-brand-gold-dark rounded-lg text-base">🔑</span>
-              لوحة تحكم المشرف وتوليد الرموز (خاصة بالشيخ المطور)
-            </h3>
-            <p className="text-xs text-zinc-500 leading-relaxed">
-              خاص بمشرف ومطور البرنامج لتوليد وحذف رموز التفعيل المخصصة لشخص واحد ومتابعة الأجهزة النشطة.
-            </p>
-          </div>
-          <span className="text-zinc-400 group-hover:text-brand-gold transition-colors text-sm font-bold">
-            {showAdminSection ? '▲ إغلاق اللوحة' : '▼ فتح لوحة التحكم'}
-          </span>
-        </button>
+      {isControlPanelVisible && (
+        <div className="bg-white rounded-2xl border-2 border-brand-gold/20 p-5 custom-shadow space-y-4">
+          <button
+            type="button"
+            onClick={() => setShowAdminSection(!showAdminSection)}
+            className="w-full text-right flex items-center justify-between group cursor-pointer focus:outline-none"
+          >
+            <div className="space-y-1 text-right">
+              <h3 className="text-base font-bold text-brand-emerald-dark flex items-center gap-2">
+                <span className="p-1.5 bg-brand-gold/10 text-brand-gold-dark rounded-lg text-base">🔑</span>
+                لوحة تحكم المشرف وتوليد الرموز (خاصة بالشيخ المطور)
+              </h3>
+              <p className="text-xs text-zinc-500 leading-relaxed">
+                خاص بمشرف ومطور البرنامج لتوليد وحذف رموز التفعيل المخصصة لشخص واحد ومتابعة الأجهزة النشطة.
+              </p>
+            </div>
+            <span className="text-zinc-400 group-hover:text-brand-gold transition-colors text-sm font-bold">
+              {showAdminSection ? '▲ إغلاق اللوحة' : '▼ فتح لوحة التحكم'}
+            </span>
+          </button>
 
-        <AnimatePresence>
-          {showAdminSection && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden border-t border-zinc-100 pt-4 space-y-4"
-            >
-              {!isAdminLoggedIn ? (
-                /* Admin Login Form */
-                <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-200/60 max-w-md mx-auto space-y-3">
-                  <div className="text-center space-y-1">
-                    <span className="text-2xl">🔐</span>
-                    <h4 className="text-xs font-bold text-zinc-800">بوابة الدخول الآمن للإدارة</h4>
-                    <p className="text-[10px] text-zinc-400">الرجاء إدخال كلمة مرور الإدارة لتوليد مفاتيح التفعيل المخصصة.</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <input
-                      type="password"
-                      value={adminPasswordInput}
-                      onChange={(e) => setAdminPasswordInput(e.target.value)}
-                      placeholder="أدخل كلمة مرور الإدارة هنا"
-                      className="w-full text-center text-xs p-2.5 rounded-lg border border-zinc-300 bg-white focus:outline-none focus:ring-1 focus:ring-brand-gold text-zinc-800 font-bold"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleAdminLogin();
-                      }}
-                    />
-
-                    <button
-                      type="button"
-                      onClick={handleAdminLogin}
-                      className="w-full py-2 bg-brand-gold hover:bg-brand-gold-light text-white text-xs font-bold rounded-lg transition-all shadow-sm cursor-pointer"
-                    >
-                      تسجيل دخول المشرف 🔑
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                /* Active Admin Control Dashboard */
-                <div className="space-y-4 font-sans text-right">
-                  {/* Header info */}
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-brand-cream/15 p-4 rounded-xl border border-brand-cream/35">
-                    <div className="space-y-1 text-right w-full sm:w-auto">
-                      <span className="text-xs font-bold text-zinc-800 block">أهلاً بك يا طالب العلم في نظام الإدارة الفوري 🌟</span>
-                      <span className="text-[10px] text-brand-emerald-dark block font-sans">أنت الآن متصل مباشرة بقاعدة البيانات السحابية الآمنة للمفاتيح.</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsAdminLoggedIn(false);
-                        setAdminKeysList({});
-                        setAdminPasswordInput('');
-                        showToast('تم تسجيل الخروج بنجاح من لوحة المشرف.', 'info');
-                      }}
-                      className="px-3 py-1.5 bg-zinc-200 hover:bg-zinc-300 text-zinc-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap self-start sm:self-center"
-                    >
-                      تسجيل خروج 🚪
-                    </button>
-                  </div>
-
-                  {/* Stats Cards */}
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                    {/* Visitor Stats */}
-                    <div className="p-3.5 rounded-xl bg-brand-cream/10 border border-brand-cream/40 text-center space-y-1 col-span-2 sm:col-span-1">
-                      <span className="text-[10px] text-zinc-500 font-bold block">👥 إجمالي الزوار للمنصة</span>
-                      <span className="text-xl font-black text-zinc-800 font-mono">
-                        {adminStats?.totalVisitors ?? 0}
-                      </span>
+          <AnimatePresence>
+            {showAdminSection && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden border-t border-zinc-100 pt-4 space-y-4"
+              >
+                {!isAdminLoggedIn ? (
+                  /* Admin Login Form */
+                  <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-200/60 max-w-md mx-auto space-y-3">
+                    <div className="text-center space-y-1">
+                      <span className="text-2xl">🔐</span>
+                      <h4 className="text-xs font-bold text-zinc-800">بوابة الدخول الآمن للإدارة</h4>
+                      <p className="text-[10px] text-zinc-400">الرجاء إدخال كلمة مرور الإدارة لتوليد مفاتيح التفعيل المخصصة.</p>
                     </div>
 
-                    {/* Subscriber Stats */}
-                    <div className="p-3.5 rounded-xl bg-amber-50/60 border border-amber-200 text-center space-y-1 col-span-2 sm:col-span-1">
-                      <span className="text-[10px] text-amber-800 font-bold block">⭐ المشتركين الفعليين</span>
-                      <span className="text-xl font-black text-amber-700 font-mono">
-                        {adminStats?.totalSubscribers ?? 0}
-                      </span>
-                    </div>
-
-                    {/* Total Keys */}
-                    <div className="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200 text-center space-y-1">
-                      <span className="text-[10px] text-zinc-500 font-bold block">🔑 مجموع المفاتيح</span>
-                      <span className="text-xl font-black text-zinc-800 font-mono">
-                        {Object.keys(adminKeysList).length}
-                      </span>
-                    </div>
-
-                    {/* Ready/Free Keys */}
-                    <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-100 text-center space-y-1">
-                      <span className="text-[10px] text-emerald-800 font-bold block">🟢 جاهزة للتسليم</span>
-                      <span className="text-xl font-black text-emerald-700 font-mono">
-                        {(Object.values(adminKeysList) as any[]).filter(k => !k.used).length}
-                      </span>
-                    </div>
-
-                    {/* Used/Activated Keys */}
-                    <div className="p-3.5 rounded-xl bg-rose-50/60 border border-rose-100 text-center space-y-1">
-                      <span className="text-[10px] text-rose-800 font-bold block">🔴 مفاتيح مستخدمة</span>
-                      <span className="text-xl font-black text-rose-700 font-mono">
-                        {(Object.values(adminKeysList) as any[]).filter(k => k.used).length}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Database Persistence Explanation Alert */}
-                  <div className="p-3 bg-brand-emerald/5 border border-brand-emerald/15 rounded-xl text-[10px] text-zinc-600 space-y-1 leading-relaxed">
-                    <div className="font-bold text-brand-emerald-dark flex items-center gap-1">
-                      <span>🔄 نظام المزامنة والتحفيظ المستمر (Persistent & Cloud Database Sync):</span>
-                    </div>
-                    <div>
-                      يتم تخزين جميع إحصائيات زوار ومشركي تطبيق <strong>جامع الفوائد</strong> بشكل مزدوج وتلقائي: سحابياً على خادم التطبيق لضمان ثباتها الدائم وعدم تصفيرها أبداً عند إغلاق المتصفح أو إطفاء الهاتف، ومحلياً عبر <strong>LocalStorage / Cache Engine</strong> لسرعة التشغيل الفوري والتصفح في وضع عدم الاتصال (Offline).
-                    </div>
-                  </div>
-
-                  {/* Generate Key Section */}
-                  <div className="p-4 rounded-xl border border-brand-gold/25 bg-zinc-50/50 space-y-3">
-                    <div className="text-right">
-                      <span className="text-xs font-bold text-zinc-800 block">➕ توليد مفتاح تفعيل جديد لشخص واحد (صالح للاستخدام لمرة واحدة):</span>
-                      <span className="text-[10px] text-zinc-400 block">اكتب اسم المستفيد لتوثيقه على النظام قبل نسخ المفتاح وإرساله له.</span>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="space-y-2">
                       <input
-                        type="text"
-                        value={newKeyNote}
-                        onChange={(e) => setNewKeyNote(e.target.value)}
-                        placeholder="مثال: رخصة الشيخ صالح الفوزان أو طالب العلم أحمد..."
-                        className="flex-1 text-xs p-2.5 rounded-lg border border-zinc-300 bg-white focus:outline-none focus:ring-1 focus:ring-brand-gold text-zinc-800 font-bold"
+                        type="password"
+                        value={adminPasswordInput}
+                        onChange={(e) => setAdminPasswordInput(e.target.value)}
+                        placeholder="أدخل كلمة مرور الإدارة هنا"
+                        className="w-full text-center text-xs p-2.5 rounded-lg border border-zinc-300 bg-white focus:outline-none focus:ring-1 focus:ring-brand-gold text-zinc-800 font-bold"
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleGenerateKey();
+                          if (e.key === 'Enter') handleAdminLogin();
                         }}
                       />
 
                       <button
                         type="button"
-                        onClick={handleGenerateKey}
-                        disabled={isGeneratingKey}
-                        className="px-5 py-2.5 bg-brand-emerald hover:bg-brand-emerald-dark disabled:bg-zinc-300 text-white text-xs font-bold rounded-lg transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                        onClick={handleAdminLogin}
+                        className="w-full py-2 bg-brand-gold hover:bg-brand-gold-light text-white text-xs font-bold rounded-lg transition-all shadow-sm cursor-pointer"
                       >
-                        {isGeneratingKey ? (
-                          <>
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            <span>جاري التوليد...</span>
-                          </>
-                        ) : (
-                          <>
-                            <span>صنع وتوليد الرمز 🔑</span>
-                          </>
-                        )}
+                        تسجيل دخول المشرف 🔑
                       </button>
                     </div>
                   </div>
-
-                  {/* Change Admin Password Section */}
-                  <div className="p-4 rounded-xl border border-zinc-200 bg-zinc-50/50 space-y-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowChangePasswordForm(!showChangePasswordForm)}
-                      className="w-full flex items-center justify-between text-xs font-bold text-zinc-700 hover:text-zinc-900 transition-colors cursor-pointer focus:outline-none"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <span>⚙️ تغيير كلمة مرور الإدارة الحالية (طالب العلم)</span>
-                      </span>
-                      <span className="text-[10px] text-zinc-500 font-bold">
-                        {showChangePasswordForm ? '▲ إغلاق النموذج' : '▼ فتح النموذج'}
-                      </span>
-                    </button>
-
-                    {showChangePasswordForm && (
-                      <div className="space-y-3 pt-2 border-t border-zinc-200/60 transition-all">
-                        <div className="text-right">
-                          <span className="text-[10px] text-zinc-500 block">
-                            تحديث كلمة مرور الدخول للوحة الإدارة. الرجاء اختيار كلمة مرور قوية لتأمين المفاتيح.
-                          </span>
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <input
-                            type="password"
-                            value={newAdminPassword}
-                            onChange={(e) => setNewAdminPassword(e.target.value)}
-                            placeholder="أدخل كلمة المرور الجديدة (4 أحرف فأكثر)"
-                            className="flex-1 text-xs p-2.5 rounded-lg border border-zinc-300 bg-white focus:outline-none focus:ring-1 focus:ring-brand-gold text-zinc-800 font-bold"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleChangeAdminPassword();
-                            }}
-                          />
-
-                          <button
-                            type="button"
-                            onClick={handleChangeAdminPassword}
-                            disabled={isChangingPassword}
-                            className="px-5 py-2.5 bg-zinc-700 hover:bg-zinc-800 disabled:bg-zinc-300 text-white text-xs font-bold rounded-lg transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
-                          >
-                            {isChangingPassword ? (
-                              <>
-                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                <span>جاري التحديث...</span>
-                              </>
-                            ) : (
-                              <span>تحديث كلمة المرور 🔐</span>
-                            )}
-                          </button>
-                        </div>
+                ) : (
+                  /* Active Admin Control Dashboard */
+                  <div className="space-y-4 font-sans text-right">
+                    {/* Header info */}
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-brand-cream/15 p-4 rounded-xl border border-brand-cream/35">
+                      <div className="space-y-1 text-right w-full sm:w-auto">
+                        <span className="text-xs font-bold text-zinc-800 block">أهلاً بك يا طالب العلم في نظام الإدارة الفوري 🌟</span>
+                        <span className="text-[10px] text-brand-emerald-dark block font-sans">أنت الآن متصل مباشرة بقاعدة البيانات السحابية الآمنة للمفاتيح.</span>
                       </div>
-                    )}
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAdminLoggedIn(false);
+                          setAdminKeysList({});
+                          setAdminPasswordInput('');
+                          showToast('تم تسجيل الخروج بنجاح من لوحة المشرف.', 'info');
+                        }}
+                        className="px-3 py-1.5 bg-zinc-200 hover:bg-zinc-300 text-zinc-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap self-start sm:self-center"
+                      >
+                        تسجيل خروج 🚪
+                      </button>
+                    </div>
 
-                  {/* List of keys on server */}
-                  <div className="space-y-2">
-                    <span className="text-xs font-bold text-zinc-700 block">📋 قائمة الرموز المسجلة حالياً على الخادم:</span>
-                    
-                    <div className="max-h-64 overflow-y-auto space-y-2 border border-zinc-200/60 p-2 rounded-xl bg-white/50">
-                      {Object.keys(adminKeysList).length === 0 ? (
-                        <p className="text-center text-xs text-zinc-400 py-4 font-sans">لا توجد رموز مسجلة حالياً في قاعدة البيانات.</p>
-                      ) : (
-                        (Object.entries(adminKeysList) as [string, any][]).map(([keyString, info]) => (
-                          <div
-                            key={keyString}
-                            className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-2.5 rounded-lg border border-zinc-150 bg-white hover:bg-zinc-50 transition-colors text-xs gap-2.5"
-                          >
-                            <div className="space-y-1 flex-1 text-right w-full">
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono font-bold text-brand-emerald-dark tracking-wide bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200 text-xs">
-                                  {keyString}
-                                </span>
-                                
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    try {
-                                      navigator.clipboard.writeText(keyString);
-                                      showToast('تم نسخ مفتاح التفعيل بنجاح لحافظة جهازك!', 'success');
-                                    } catch (err) {
-                                      showToast('فشل في النسخ التلقائي.', 'warning');
-                                    }
-                                  }}
-                                  className="p-1 hover:bg-zinc-100 rounded text-zinc-400 hover:text-zinc-700 transition-colors cursor-pointer"
-                                  title="نسخ الكود"
-                                >
-                                  <Copy className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
+                    {/* Stats Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                      {/* Visitor Stats */}
+                      <div className="p-3.5 rounded-xl bg-brand-cream/10 border border-brand-cream/40 text-center space-y-1 col-span-2 sm:col-span-1">
+                        <span className="text-[10px] text-zinc-500 font-bold block">👥 إجمالي الزوار للمنصة</span>
+                        <span className="text-xl font-black text-zinc-800 font-mono">
+                          {adminStats?.totalVisitors ?? 0}
+                        </span>
+                      </div>
 
-                              <div className="flex flex-wrap items-center gap-2 text-[10px] text-zinc-500">
-                                <span className="font-bold text-zinc-700">👤 المستفيد:</span>
-                                <span>{info.note || 'مفتاح مخصص'}</span>
-                                {info.createdAt && (
-                                  <>
-                                    <span className="text-zinc-300">|</span>
-                                    <span>صُنع بتاريخ: {new Date(info.createdAt).toLocaleDateString('ar-SA')}</span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
+                      {/* Subscriber Stats */}
+                      <div className="p-3.5 rounded-xl bg-amber-50/60 border border-amber-200 text-center space-y-1 col-span-2 sm:col-span-1">
+                        <span className="text-[10px] text-amber-800 font-bold block">⭐ المشتركين الفعليين</span>
+                        <span className="text-xl font-black text-amber-700 font-mono">
+                          {adminStats?.totalSubscribers ?? 0}
+                        </span>
+                      </div>
 
-                            {/* Status indicator */}
-                            <div className="flex items-center justify-end gap-2 shrink-0 w-full sm:w-auto">
-                              {info.used ? (
-                                <div className="text-[10px] text-right text-rose-700 bg-rose-50 border border-rose-100 p-1.5 rounded-lg leading-relaxed flex flex-col">
-                                  <span className="font-bold text-center">🔴 تم استخدامه</span>
-                                  {info.activatedAt && (
-                                    <span className="text-[8px] opacity-80">
-                                      في: {new Date(info.activatedAt).toLocaleString('ar-SA')}
-                                    </span>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="px-2 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold rounded-lg shrink-0">
-                                  🟢 نشط وجاهز
-                                </span>
-                              )}
+                      {/* Total Keys */}
+                      <div className="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200 text-center space-y-1">
+                        <span className="text-[10px] text-zinc-500 font-bold block">🔑 مجموع المفاتيح</span>
+                        <span className="text-xl font-black text-zinc-800 font-mono">
+                          {Object.keys(adminKeysList).length}
+                        </span>
+                      </div>
 
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteKey(keyString)}
-                                disabled={isDeletingKey === keyString}
-                                className="p-2 hover:bg-rose-50 text-rose-600 rounded-lg transition-colors cursor-pointer disabled:opacity-50 shrink-0"
-                                title="حذف الرمز نهائياً"
-                              >
-                                {isDeletingKey === keyString ? (
-                                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                  <span>🗑️</span>
-                                )}
-                              </button>
-                            </div>
+                      {/* Ready/Free Keys */}
+                      <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-100 text-center space-y-1">
+                        <span className="text-[10px] text-emerald-800 font-bold block">🟢 جاهزة للتسليم</span>
+                        <span className="text-xl font-black text-emerald-700 font-mono">
+                          {(Object.values(adminKeysList) as any[]).filter(k => !k.used).length}
+                        </span>
+                      </div>
+
+                      {/* Used/Activated Keys */}
+                      <div className="p-3.5 rounded-xl bg-rose-50/60 border border-rose-100 text-center space-y-1">
+                        <span className="text-[10px] text-rose-800 font-bold block">🔴 مفاتيح مستخدمة</span>
+                        <span className="text-xl font-black text-rose-700 font-mono">
+                          {(Object.values(adminKeysList) as any[]).filter(k => k.used).length}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Database Persistence Explanation Alert */}
+                    <div className="p-3 bg-brand-emerald/5 border border-brand-emerald/15 rounded-xl text-[10px] text-zinc-600 space-y-1 leading-relaxed">
+                      <div className="font-bold text-brand-emerald-dark flex items-center gap-1">
+                        <span>🔄 نظام المزامنة والتحفيظ المستمر (Persistent & Cloud Database Sync):</span>
+                      </div>
+                      <div>
+                        يتم تخزين جميع إحصائيات زوار ومشركي تطبيق <strong>جامع الفوائد</strong> بشكل مزدوج وتلقائي: سحابياً على خادم التطبيق لضمان ثباتها الدائم وعدم تصفيرها أبداً عند إغلاق المتصفح أو إطفاء الهاتف، ومحلياً عبر <strong>LocalStorage / Cache Engine</strong> لسرعة التشغيل الفوري والتصفح في وضع عدم الاتصال (Offline).
+                      </div>
+                    </div>
+
+                    {/* Generate Key Section */}
+                    <div className="p-4 rounded-xl border border-brand-gold/25 bg-zinc-50/50 space-y-3">
+                      <div className="text-right">
+                        <span className="text-xs font-bold text-zinc-800 block">➕ توليد مفتاح تفعيل جديد لشخص واحد (صالح للاستخدام لمرة واحدة):</span>
+                        <span className="text-[10px] text-zinc-400 block">اكتب اسم المستفيد لتوثيقه على النظام قبل نسخ المفتاح وإرساله له.</span>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="text"
+                          value={newKeyNote}
+                          onChange={(e) => setNewKeyNote(e.target.value)}
+                          placeholder="مثال: رخصة الشيخ صالح الفوزان أو طالب العلم أحمد..."
+                          className="flex-1 text-xs p-2.5 rounded-lg border border-zinc-300 bg-white focus:outline-none focus:ring-1 focus:ring-brand-gold text-zinc-800 font-bold"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleGenerateKey();
+                          }}
+                        />
+
+                        <button
+                          type="button"
+                          onClick={handleGenerateKey}
+                          disabled={isGeneratingKey}
+                          className="px-5 py-2.5 bg-brand-emerald hover:bg-brand-emerald-dark disabled:bg-zinc-300 text-white text-xs font-bold rounded-lg transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                        >
+                          {isGeneratingKey ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>جاري التوليد...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>صنع وتوليد الرمز 🔑</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Change Admin Password Section */}
+                    <div className="p-4 rounded-xl border border-zinc-200 bg-zinc-50/50 space-y-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowChangePasswordForm(!showChangePasswordForm)}
+                        className="w-full flex items-center justify-between text-xs font-bold text-zinc-700 hover:text-zinc-900 transition-colors cursor-pointer focus:outline-none"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <span>⚙️ تغيير كلمة مرور الإدارة الحالية (طالب العلم)</span>
+                        </span>
+                        <span className="text-[10px] text-zinc-500 font-bold">
+                          {showChangePasswordForm ? '▲ إغلاق النموذج' : '▼ فتح النموذج'}
+                        </span>
+                      </button>
+
+                      {showChangePasswordForm && (
+                        <div className="space-y-3 pt-2 border-t border-zinc-200/60 transition-all">
+                          <div className="text-right">
+                            <span className="text-[10px] text-zinc-500 block">
+                              تحديث كلمة مرور الدخول للوحة الإدارة. الرجاء اختيار كلمة مرور قوية لتأمين المفاتيح.
+                            </span>
                           </div>
-                        ))
+
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <input
+                              type="password"
+                              value={newAdminPassword}
+                              onChange={(e) => setNewAdminPassword(e.target.value)}
+                              placeholder="أدخل كلمة المرور الجديدة (4 أحرف فأكثر)"
+                              className="flex-1 text-xs p-2.5 rounded-lg border border-zinc-300 bg-white focus:outline-none focus:ring-1 focus:ring-brand-gold text-zinc-800 font-bold"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleChangeAdminPassword();
+                              }}
+                            />
+
+                            <button
+                              type="button"
+                              onClick={handleChangeAdminPassword}
+                              disabled={isChangingPassword}
+                              className="px-5 py-2.5 bg-zinc-700 hover:bg-zinc-800 disabled:bg-zinc-300 text-white text-xs font-bold rounded-lg transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                            >
+                              {isChangingPassword ? (
+                                <>
+                                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                  <span>جاري التحديث...</span>
+                                </>
+                              ) : (
+                                <span>تحديث كلمة المرور 🔐</span>
+                              )}
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
-                  </div>
 
-                  {/* Reset database button */}
-                  <div className="pt-3 border-t border-zinc-200/60 flex items-center justify-between text-[10px] text-zinc-400">
-                    <span>* جميع العمليات تتم مباشرة عبر قاعدة البيانات السحابية.</span>
-                    <button
-                      type="button"
-                      onClick={handleResetKeys}
-                      className="text-rose-600 hover:text-rose-700 font-bold hover:underline cursor-pointer"
-                    >
-                      إعادة تهيئة المفاتيح الافتراضية ⚠️
-                    </button>
+                    {/* List of keys on server */}
+                    <div className="space-y-2">
+                      <span className="text-xs font-bold text-zinc-700 block">📋 قائمة الرموز المسجلة حالياً على الخادم:</span>
+                      
+                      <div className="max-h-64 overflow-y-auto space-y-2 border border-zinc-200/60 p-2 rounded-xl bg-white/50">
+                        {Object.keys(adminKeysList).length === 0 ? (
+                          <p className="text-center text-xs text-zinc-400 py-4 font-sans">لا توجد رموز مسجلة حالياً في قاعدة البيانات.</p>
+                        ) : (
+                          (Object.entries(adminKeysList) as [string, any][]).map(([keyString, info]) => (
+                            <div
+                              key={keyString}
+                              className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-2.5 rounded-lg border border-zinc-150 bg-white hover:bg-zinc-50 transition-colors text-xs gap-2.5"
+                            >
+                              <div className="space-y-1 flex-1 text-right w-full">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono font-bold text-brand-emerald-dark tracking-wide bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200 text-xs">
+                                    {keyString}
+                                  </span>
+                                  
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      try {
+                                        navigator.clipboard.writeText(keyString);
+                                        showToast('تم نسخ مفتاح التفعيل بنجاح لحافظة جهازك!', 'success');
+                                      } catch (err) {
+                                        showToast('فشل في النسخ التلقائي.', 'warning');
+                                      }
+                                    }}
+                                    className="p-1 hover:bg-zinc-100 rounded text-zinc-400 hover:text-zinc-700 transition-colors cursor-pointer"
+                                    title="نسخ الكود"
+                                  >
+                                    <Copy className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-2 text-[10px] text-zinc-500">
+                                  <span className="font-bold text-zinc-700">👤 المستفيد:</span>
+                                  <span>{info.note || 'مفتاح مخصص'}</span>
+                                  {info.createdAt && (
+                                    <>
+                                      <span className="text-zinc-300">|</span>
+                                      <span>صُنع بتاريخ: {new Date(info.createdAt).toLocaleDateString('ar-SA')}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Status indicator */}
+                              <div className="flex items-center justify-end gap-2 shrink-0 w-full sm:w-auto">
+                                {info.used ? (
+                                  <div className="text-[10px] text-right text-rose-700 bg-rose-50 border border-rose-100 p-1.5 rounded-lg leading-relaxed flex flex-col">
+                                    <span className="font-bold text-center">🔴 تم استخدامه</span>
+                                    {info.activatedAt && (
+                                      <span className="text-[8px] opacity-80">
+                                        في: {new Date(info.activatedAt).toLocaleString('ar-SA')}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="px-2 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold rounded-lg shrink-0">
+                                    🟢 نشط وجاهز
+                                  </span>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteKey(keyString)}
+                                  disabled={isDeletingKey === keyString}
+                                  className="p-2 hover:bg-rose-50 text-rose-600 rounded-lg transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+                                  title="حذف الرمز نهائياً"
+                                >
+                                  {isDeletingKey === keyString ? (
+                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <span>🗑️</span>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Reset database button */}
+                    <div className="pt-3 border-t border-zinc-200/60 flex items-center justify-between text-[10px] text-zinc-400">
+                      <span>* جميع العمليات تتم مباشرة عبر قاعدة البيانات السحابية.</span>
+                      <button
+                        type="button"
+                        onClick={handleResetKeys}
+                        className="text-rose-600 hover:text-rose-700 font-bold hover:underline cursor-pointer"
+                      >
+                        إعادة تهيئة المفاتيح الافتراضية ⚠️
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
 
       {/* 4. Developer and App Information */}
       <div className="bg-gradient-to-l from-brand-emerald-dark to-brand-emerald rounded-2xl p-6 text-white border border-brand-gold/20 custom-shadow">
@@ -2081,7 +2237,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
           <div className="space-y-3 font-sans">
-            <div className="flex items-center gap-3">
+            <div
+              onMouseDown={startHoldDeveloper}
+              onMouseUp={cancelHoldDeveloper}
+              onMouseLeave={cancelHoldDeveloper}
+              onTouchStart={startHoldDeveloper}
+              onTouchEnd={cancelHoldDeveloper}
+              className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 border border-transparent transition-all duration-300 cursor-pointer select-none"
+            >
               <div className="p-2 bg-white/10 rounded-xl border border-white/10 text-brand-gold-light shrink-0">
                 <User className="w-5 h-5" />
               </div>

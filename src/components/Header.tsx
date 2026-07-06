@@ -11,6 +11,7 @@ interface HeaderProps {
   showToast: (msg: string, type: 'success' | 'info' | 'warning') => void;
   settings: AppSettings;
   onUpdateSettings: (settings: AppSettings) => void;
+  onUnlockControlPanel?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -20,16 +21,61 @@ export const Header: React.FC<HeaderProps> = ({
   showToast,
   settings,
   onUpdateSettings,
+  onUnlockControlPanel,
 }) => {
   const [randomBenefit, setRandomBenefit] = useState<Benefit | null>(null);
   const [copied, setCopied] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(settings.programmerName);
 
+  const [isHolding, setIsHolding] = useState(false);
+  const timerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = React.useRef<NodeJS.Timeout | null>(null);
+  const holdStartTimeRef = React.useRef<number>(0);
+
   // keep in sync with settings prop updates
   useEffect(() => {
     setEditedName(settings.programmerName);
   }, [settings.programmerName]);
+
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  const startHold = (e: React.MouseEvent | React.TouchEvent) => {
+    holdStartTimeRef.current = Date.now();
+    setIsHolding(true);
+
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    timerRef.current = setTimeout(() => {
+      setIsHolding(false);
+      timerRef.current = null;
+
+      if (onUnlockControlPanel) {
+        onUnlockControlPanel();
+      }
+    }, 5000);
+  };
+
+  const cancelHold = (e: React.MouseEvent | React.TouchEvent) => {
+    const holdDuration = Date.now() - holdStartTimeRef.current;
+
+    if (isHolding) {
+      setIsHolding(false);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = null;
+
+      // If duration is less than 500ms, perform a regular click to edit the name
+      if (holdDuration < 500) {
+        setIsEditingName(true);
+      }
+    }
+  };
 
   const saveName = () => {
     if (editedName.trim() === '') {
@@ -126,7 +172,11 @@ export const Header: React.FC<HeaderProps> = ({
                     {settings.programmerName}
                   </span>
                   <button
-                    onClick={() => setIsEditingName(true)}
+                    onMouseDown={startHold}
+                    onMouseUp={cancelHold}
+                    onMouseLeave={cancelHold}
+                    onTouchStart={startHold}
+                    onTouchEnd={cancelHold}
                     className="p-1.5 bg-white/5 hover:bg-white/15 text-zinc-300 hover:text-brand-gold-light rounded-lg transition-colors cursor-pointer"
                     title="تعديل هذا الاسم"
                   >

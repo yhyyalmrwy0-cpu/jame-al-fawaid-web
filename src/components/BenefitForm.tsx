@@ -5,6 +5,59 @@ import { Benefit, CATEGORIES, CategoryType } from '../types';
 import { PremiumPromoModal } from './PremiumPromoModal';
 import { getApiUrl } from '../utils/api';
 
+const compressImage = (file: File, maxWidth = 1600, maxHeight = 1600, quality = 0.85): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = document.createElement('img');
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        // Apply max dimensions keeping aspect ratio
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          console.warn('[القارئ الذكي] فشل إنشاء سياق 2D للوحة الرسم (Canvas)، سيتم استخدام الصورة الأصلية.');
+          resolve(event.target?.result as string);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Compress to JPEG for maximum compression
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressedDataUrl);
+      };
+      img.onerror = (err) => {
+        console.error('[القارئ الذكي] فشل تحميل الصورة للضغط:', err);
+        reject(err);
+      };
+    };
+    reader.onerror = (err) => {
+      console.error('[القارئ الذكي] فشل قراءة الملف للضغط:', err);
+      reject(err);
+    };
+  });
+};
+
 interface BenefitFormProps {
   onSave: (benefit: Omit<Benefit, 'id' | 'views' | 'isFavorite' | 'createdAt'>) => void;
   initialBenefit?: Benefit | null;
@@ -79,6 +132,12 @@ export const BenefitForm: React.FC<BenefitFormProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!file.type.startsWith('image/')) {
+      showToast('يرجى اختيار ملف صورة صالح فقط (PNG, JPEG, WEBP, ...). 📸', 'warning');
+      e.target.value = '';
+      return;
+    }
+
     const isActivated = localStorage.getItem('abuosid_app_activated') === 'true';
     if (!isActivated) {
       if (ocrUses >= 7) {
@@ -95,53 +154,63 @@ export const BenefitForm: React.FC<BenefitFormProps> = ({
     }
 
     setIsOcrLoading(true);
-    showToast('جاري معالجة الصورة وقراءة النص بالذكاء الاصطناعي... ⏳', 'info');
+    showToast('جاري ضغط ومعالجة الصورة لتقليل الحجم وتسريع الرفع... ⚡', 'info');
+
+    const originalSizeKB = Math.round(file.size / 1024);
+    console.log(`[القارئ الذكي] حجم الصورة الأصلي: ${originalSizeKB} KB`);
 
     try {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64String = reader.result as string;
-        try {
-          const response = await fetch(getApiUrl('/api/gemini/ocr'), {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              image: base64String,
-              mimeType: file.type
-            }),
-          });
+      const base64String = await compressImage(file);
+      const compressedSizeKB = Math.round((base64String.length * 3) / 4 / 1024);
+      console.log(`[القارئ الذكي] حجم الصورة بعد الضغط: ${compressedSizeKB} KB (نسبة التقليص: ${originalSizeKB > 0 ? Math.round((1 - compressedSizeKB / originalSizeKB) * 100) : 0}%)`);
 
-          const data = await response.json();
-          if (response.ok && data.success) {
-            const extractedText = data.text;
-            if (extractedText && extractedText.trim()) {
-              setContent((prev) => prev ? `${prev}\n\n${extractedText}` : extractedText);
-              showToast('تم استخراج النص وتفريغه تلقائياً بنجاح! ✨📖', 'success');
-            } else {
-              showToast('لم نتمكن من العثور على نص واضح في الصورة. يرجى التأكد من جودة الصورة والمحاولة مجدداً.', 'warning');
-            }
-          } else {
-            showToast(data.message || 'فشل استخراج النص من الصورة.', 'warning');
-          }
-        } catch (error) {
-          console.error('[القارئ الذكي] خطأ أثناء الاتصال بالخادم:', error);
-          showToast('حدث خطأ أثناء الاتصال بالخادم لمسح الصورة.', 'warning');
-        } finally {
-          setIsOcrLoading(false);
-          e.target.value = '';
+      showToast('جاري إرسال الصورة وقراءتها بالذكاء الاصطناعي (Gemini OCR)... ⏳', 'info');
+
+      try {
+        const response = await fetch(getApiUrl('/api/gemini/ocr'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            image: base64String,
+            mimeType: 'image/jpeg'
+          }),
+        });
+
+        const contentType = response.headers.get('content-type');
+        let data: any;
+        if (contentType && contentType.includes('application/json')) {
+          data = await response.json();
+        } else {
+          const rawText = await response.text();
+          throw new Error(`استجابة غير صالحة من الخادم (ليست JSON): ${rawText.slice(0, 200)}...`);
         }
-      };
-      reader.onerror = () => {
-        showToast('فشل قراءة ملف الصورة محلياً.', 'warning');
+
+        if (response.ok && data.success) {
+          const extractedText = data.text;
+          if (extractedText && extractedText.trim()) {
+            setContent((prev) => prev ? `${prev}\n\n${extractedText}` : extractedText);
+            showToast('تم استخراج النص وتفريغه تلقائياً بنجاح! ✨📖', 'success');
+          } else {
+            showToast('لم نتمكن من العثور على نص واضح في الصورة. يرجى التأكد من جودة الصورة والمحاولة مجدداً.', 'warning');
+          }
+        } else {
+          console.error('[القارئ الذكي] فشل استخراج النص من السيرفر. كود الاستجابة:', response.status, 'البيانات:', data);
+          showToast(data.message || 'فشل استخراج النص من الصورة.', 'warning');
+        }
+      } catch (error: any) {
+        console.error('[القارئ الذكي] خطأ شبكة أو اتصال أثناء الإرسال لخادم الـ OCR:', error);
+        showToast(`حدث خطأ أثناء الاتصال بالخادم: ${error.message || 'خطأ في الشبكة'}`, 'warning');
+      } finally {
         setIsOcrLoading(false);
-      };
-      reader.readAsDataURL(file);
+        e.target.value = '';
+      }
     } catch (err) {
-      console.error('[القارئ الذكي] خطأ غير متوقع:', err);
-      showToast('حدث خطأ غير متوقع أثناء تحميل الصورة.', 'warning');
+      console.error('[القارئ الذكي] فشل ضغط الصورة محلياً أو خطأ غير متوقع:', err);
+      showToast('حدث خطأ غير متوقع أثناء معالجة وضغط الصورة.', 'warning');
       setIsOcrLoading(false);
+      e.target.value = '';
     }
   };
 

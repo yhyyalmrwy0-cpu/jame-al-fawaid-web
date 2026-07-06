@@ -77,7 +77,8 @@ export function exportBenefitsToPDF(
   authorName: string,
   appEmail: string,
   includeCover: boolean = true,
-  selectedCategory: string = 'all'
+  selectedCategory: string = 'all',
+  pdfTheme: string = 'emerald'
 ) {
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
@@ -109,6 +110,70 @@ export function exportBenefitsToPDF(
     categoriesToProcess = [selectedCategory];
   }
 
+  // Dynamic Design Customizations based on chosen theme and style
+  let primaryColor = '#1e3a2b';
+  let accentColor = '#b5944e';
+  let rowEvenColor = '#faf8f5';
+  let borderColor = '#d4cfc5';
+  
+  let bookBg = '#fdfbf7';
+  let bookPrimary = '#1e3a2b';
+  let bookAccent = '#b5944e';
+  let bookTextColor = '#111111';
+  let bookBorder = '14px double #1e3a2b';
+  let bookOutline = '3px solid #b5944e';
+  let bookHeadingFont = "'Tajawal', sans-serif";
+  let bookContentFont = "'Amiri', serif";
+  let coverCardBg = '#fdfcf9';
+  let coverAuthorBoxBg = '#f7f3e8';
+  let coverAuthorBoxBorder = '1px solid #dcd3b8';
+  let tableHeaderBg = '#1e3a2b';
+  let tableHeaderTextColor = '#ffffff';
+
+  if (style === 'grid') {
+    if (pdfTheme === 'sapphire') {
+      primaryColor = '#1e3a8a';
+      accentColor = '#06b6d4';
+      rowEvenColor = '#f1f5f9';
+      borderColor = '#cbd5e1';
+      tableHeaderBg = '#1e3a8a';
+    } else if (pdfTheme === 'ruby') {
+      primaryColor = '#7f1d1d';
+      accentColor = '#c2410c';
+      rowEvenColor = '#fff5f5';
+      borderColor = '#fca5a5';
+      tableHeaderBg = '#7f1d1d';
+    } else if (pdfTheme === 'charcoal') {
+      primaryColor = '#18181b';
+      accentColor = '#10b981';
+      rowEvenColor = '#f4f4f5';
+      borderColor = '#e4e4e7';
+      tableHeaderBg = '#18181b';
+    }
+  } else if (style === 'book') {
+    if (pdfTheme === 'royal') {
+      bookBg = '#faf5ff';
+      bookPrimary = '#1e1b4b';
+      bookAccent = '#eab308';
+      bookTextColor = '#1e1b4b';
+      bookBorder = '14px double #1e1b4b';
+      bookOutline = '3px solid #eab308';
+      coverCardBg = '#faf8ff';
+      coverAuthorBoxBg = '#f3e8ff';
+      coverAuthorBoxBorder = '1px solid #ddd6fe';
+    } else if (pdfTheme === 'minimal') {
+      bookBg = '#ffffff';
+      bookPrimary = '#18181b';
+      bookAccent = '#71717a';
+      bookTextColor = '#1c1917';
+      bookBorder = '2px solid #27272a';
+      bookOutline = '1px dashed #a1a1aa';
+      coverCardBg = '#ffffff';
+      coverAuthorBoxBg = '#f4f4f5';
+      coverAuthorBoxBorder = '1px solid #e4e4e7';
+    }
+  }
+
   // Generate Table/Grid layout rows safely
   let rowsHTML = '';
   if (style === 'grid') {
@@ -120,32 +185,32 @@ export function exportBenefitsToPDF(
         <div class="category-section-title">📋 قسم ${category}</div>
         <table>
           <colgroup>
-            <col style="width: 5%;">
-            <col style="width: 20%;">
-            <col style="width: 45%;">
+            <col style="width: 4%;">
+            <col style="width: 16%;">
+            <col style="width: 38%;">
             <col style="width: 12%;">
-            <col style="width: 10%;">
-            <col style="width: 8%;">
+            <col style="width: 15%;">
+            <col style="width: 15%;">
           </colgroup>
           <thead>
             <tr>
-              <th style="text-align: center;">م</th>
-              <th>العنوان</th>
+              <th style="text-align: center; white-space: nowrap;">م</th>
+              <th style="white-space: nowrap;">العنوان</th>
               <th>نص الفائدة المقيدة</th>
-              <th>المصدر / الكتاب</th>
-              <th style="text-align: center;">التصنيف</th>
-              <th style="text-align: center;">تاريخ القيد</th>
+              <th style="white-space: nowrap;">المصدر / الكتاب</th>
+              <th style="text-align: center; white-space: nowrap;">التصنيف</th>
+              <th style="text-align: center; white-space: nowrap;">تاريخ القيد</th>
             </tr>
           </thead>
           <tbody>
             ${catBenefits.map((b, idx) => `
               <tr>
-                <td style="text-align: center; font-weight: bold; color: #1e3a2b;">${idx + 1}</td>
+                <td style="text-align: center; font-weight: bold; color: ${primaryColor};">${idx + 1}</td>
                 <td style="font-weight: bold; color: #1a1a1a; font-family: 'Tajawal', sans-serif;">${b.title}</td>
                 <td class="content-cell">${b.content}</td>
                 <td style="color: #444; font-family: 'Tajawal', sans-serif;">${b.source || 'غير محدد'}</td>
-                <td style="text-align: center;"><span class="badge">${b.category}</span></td>
-                <td style="text-align: center; color: #555; direction: rtl; font-size: 11px;">${formatToHijriAndGregorian(b.date).split(' - ')[0]}</td>
+                <td style="text-align: center; white-space: nowrap;"><span class="badge">${b.category}</span></td>
+                <td style="text-align: center; color: #555; direction: rtl; font-size: 11px; white-space: nowrap;">${formatToHijriAndGregorian(b.date).split(' - ')[0]}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -234,7 +299,7 @@ export function exportBenefitsToPDF(
         /* General Printing Configurations with Page Numbering */
         @page {
           size: A4 portrait;
-          margin: 20mm 15mm 20mm 15mm;
+          margin: ${style === 'grid' ? '12mm 10mm 15mm 10mm' : '20mm 15mm 20mm 15mm'};
           @bottom-center {
             content: "— " counter(page) " —";
             font-family: 'Amiri', serif;
@@ -280,19 +345,19 @@ export function exportBenefitsToPDF(
           page-break-after: always;
           page-break-inside: avoid;
           break-after: page;
-          height: 297mm; /* Exact A4 standard height to fill the entire first page perfectly */
-          width: 210mm;  /* Exact A4 standard width */
+          height: 255mm; /* Exact safe height to prevent overflow on first page */
+          width: 100%;
           margin: 0 auto;
-          padding: 30mm 20mm; /* Spacious classical padding */
-          border: 14px double #1e3a2b; /* Thick, rich scholarly double border */
-          outline: 3px solid #b5944e;  /* Golden inner geometric border line */
-          outline-offset: -24px;       /* Beautifully spaced relative to double border */
+          padding: 20mm 15mm; /* Spacious classical padding */
+          border: ${bookBorder}; /* Thick, rich scholarly double border */
+          outline: ${bookOutline};  /* Golden inner geometric border line */
+          outline-offset: -20px;       /* Beautifully spaced relative to double border */
           display: flex;
           flex-direction: column;
           justify-content: space-between;
           align-items: center;
           text-align: center;
-          background-color: #fdfbf7;
+          background-color: ${bookBg};
           box-sizing: border-box;
           position: relative;
         }
@@ -302,28 +367,28 @@ export function exportBenefitsToPDF(
           position: absolute;
           width: 35px;
           height: 35px;
-          border-color: #b5944e;
+          border-color: ${bookAccent};
           border-style: solid;
           pointer-events: none;
         }
         .cover-corner.top-right {
-          top: 26px;
-          right: 26px;
+          top: 22px;
+          right: 22px;
           border-width: 4px 4px 0 0;
         }
         .cover-corner.top-left {
-          top: 26px;
-          left: 26px;
+          top: 22px;
+          left: 22px;
           border-width: 4px 0 0 4px;
         }
         .cover-corner.bottom-right {
-          bottom: 26px;
-          right: 26px;
+          bottom: 22px;
+          right: 22px;
           border-width: 0 4px 4px 0;
         }
         .cover-corner.bottom-left {
-          bottom: 26px;
-          left: 26px;
+          bottom: 22px;
+          left: 22px;
           border-width: 0 0 4px 4px;
         }
 
@@ -336,7 +401,7 @@ export function exportBenefitsToPDF(
           font-family: 'Tajawal', sans-serif;
           font-size: 15px;
           font-weight: 900;
-          color: #1e3a2b;
+          color: ${bookPrimary};
           letter-spacing: 1.5px;
           text-transform: uppercase;
         }
@@ -344,14 +409,14 @@ export function exportBenefitsToPDF(
         .cover-top-sub {
           font-family: 'Amiri', serif;
           font-size: 11px;
-          color: #b5944e;
+          color: ${bookAccent};
           margin-top: 6px;
           font-weight: bold;
         }
 
         .cover-ornament {
           font-size: 20px;
-          color: #b5944e;
+          color: ${bookAccent};
           margin: 15px 0;
           letter-spacing: 5px;
         }
@@ -365,8 +430,8 @@ export function exportBenefitsToPDF(
         }
 
         .cover-title-shield {
-          border: 1px solid rgba(181, 148, 78, 0.4);
-          background: #fdfcf9;
+          border: 1px solid ${bookAccent}80;
+          background: ${coverCardBg};
           padding: 20px 25px;
           border-radius: 12px;
           box-shadow: 0 4px 12px rgba(30, 58, 43, 0.03);
@@ -382,27 +447,27 @@ export function exportBenefitsToPDF(
           position: absolute;
           width: 8px;
           height: 8px;
-          border: 1px solid #b5944e;
+          border: 1px solid ${bookAccent};
           border-radius: 50%;
         }
         .cover-title-shield::before {
           top: -4px;
           left: 50%;
           transform: translateX(-50%);
-          background: #fdfbf7;
+          background: ${bookBg};
         }
         .cover-title-shield::after {
           bottom: -4px;
           left: 50%;
           transform: translateX(-50%);
-          background: #fdfbf7;
+          background: ${bookBg};
         }
 
         .cover-title {
           font-family: 'Amiri', serif;
           font-size: 38px;
           font-weight: 700;
-          color: #1e3a2b;
+          color: ${bookPrimary};
           margin: 0;
           line-height: 1.35;
           text-shadow: 0.5px 0.5px 0px rgba(181, 148, 78, 0.2);
@@ -411,7 +476,7 @@ export function exportBenefitsToPDF(
         .cover-divider {
           width: 180px;
           height: 3px;
-          background: linear-gradient(to left, transparent, #b5944e, transparent);
+          background: linear-gradient(to left, transparent, ${bookAccent}, transparent);
           margin: 15px auto 15px auto;
         }
 
@@ -426,10 +491,10 @@ export function exportBenefitsToPDF(
         }
 
         .cover-author-box {
-          background-color: #f7f3e8;
-          border: 1px solid #dcd3b8;
-          border-right: 4px solid #1e3a2b;
-          border-left: 4px solid #1e3a2b;
+          background-color: ${coverAuthorBoxBg};
+          border: ${coverAuthorBoxBorder};
+          border-right: 4px solid ${bookPrimary};
+          border-left: 4px solid ${bookPrimary};
           padding: 12px 35px;
           border-radius: 100px;
           display: inline-block;
@@ -441,7 +506,7 @@ export function exportBenefitsToPDF(
         .cover-author-label {
           font-family: 'Tajawal', sans-serif;
           font-size: 11px;
-          color: #706856;
+          color: ${bookAccent};
           margin-bottom: 4px;
           font-weight: 700;
         }
@@ -450,13 +515,13 @@ export function exportBenefitsToPDF(
           font-family: 'Amiri', serif;
           font-size: 24px;
           font-weight: 700;
-          color: #1e3a2b;
+          color: ${bookPrimary};
         }
 
         .cover-footer {
           margin-bottom: 5mm;
           width: 85%;
-          border-top: 1px solid #e2ddcf;
+          border-top: 1px solid ${borderColor};
           padding-top: 15px;
         }
 
@@ -464,9 +529,9 @@ export function exportBenefitsToPDF(
           font-family: 'Amiri', serif;
           font-size: 13px;
           font-weight: bold;
-          color: #1e3a2b;
+          color: ${bookPrimary};
           background-color: #fcfbfa;
-          border: 1px solid #b5944e;
+          border: 1px solid ${bookAccent};
           padding: 3px 18px;
           border-radius: 30px;
           display: inline-block;
@@ -482,7 +547,7 @@ export function exportBenefitsToPDF(
         
         /* Grid Header Styling */
         .pdf-header {
-          border-bottom: 2px solid #b5944e;
+          border-bottom: 2px solid ${accentColor};
           padding-bottom: 12px;
           margin-bottom: 20px;
           display: flex;
@@ -494,7 +559,7 @@ export function exportBenefitsToPDF(
           font-family: 'Tajawal', sans-serif;
           font-weight: 900;
           font-size: 24px;
-          color: #1e3a2b;
+          color: ${primaryColor};
           margin: 0 0 4px 0;
         }
         
@@ -502,7 +567,7 @@ export function exportBenefitsToPDF(
           font-family: 'Tajawal', sans-serif;
           font-weight: 700;
           font-size: 14px;
-          color: #b5944e;
+          color: ${accentColor};
           margin: 0;
         }
         
@@ -514,13 +579,13 @@ export function exportBenefitsToPDF(
         }
         
         .header-meta strong {
-          color: #1e3a2b;
+          color: ${primaryColor};
         }
 
         /* Decorative Divider Accent */
         .decorative-bar {
           height: 3px;
-          background: linear-gradient(to left, #1e3a2b, #b5944e, #1e3a2b);
+          background: linear-gradient(to left, ${primaryColor}, ${accentColor}, ${primaryColor});
           margin-bottom: 20px;
           border-radius: 2px;
         }
@@ -529,25 +594,40 @@ export function exportBenefitsToPDF(
         table {
           width: 100%;
           table-layout: fixed;
-          border-collapse: collapse;
+          border-collapse: separate;
+          border-spacing: 0;
+          border: 1px solid ${borderColor};
+          border-radius: 8px;
+          overflow: hidden;
           margin-top: 10px;
           margin-bottom: 30px;
           box-sizing: border-box;
           word-wrap: break-word;
           overflow-wrap: break-word;
-        }
-        
-        tr {
           page-break-inside: auto;
         }
         
+        thead {
+          display: table-header-group;
+        }
+
+        tbody {
+          display: table-row-group;
+        }
+
+        tr {
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+        
         th {
-          background-color: #1e3a2b;
-          color: #ffffff;
+          background-color: ${tableHeaderBg};
+          color: ${tableHeaderTextColor};
           font-weight: 700;
           font-size: 12px;
           padding: 10px 8px;
-          border: 1px solid #1e3a2b;
+          border-bottom: 1px solid ${borderColor};
+          border-left: 1px solid ${borderColor};
           text-align: right;
           font-family: 'Tajawal', sans-serif;
         }
@@ -555,16 +635,29 @@ export function exportBenefitsToPDF(
         th:first-child {
           text-align: center;
         }
+
+        th:last-child {
+          border-left: none;
+        }
         
         td {
           padding: 10px 8px;
-          border: 1px solid #d4cfc5;
+          border-bottom: 1px solid ${borderColor};
+          border-left: 1px solid ${borderColor};
           vertical-align: top;
           line-height: 1.6;
           font-size: 12px;
           word-wrap: break-word;
           overflow-wrap: break-word;
           word-break: break-word;
+        }
+
+        td:last-child {
+          border-left: none;
+        }
+
+        tr:last-child td {
+          border-bottom: none;
         }
         
         .content-cell {
@@ -577,13 +670,13 @@ export function exportBenefitsToPDF(
         }
         
         tr:nth-child(even) {
-          background-color: #faf8f5;
+          background-color: ${rowEvenColor};
         }
         
         .badge {
           display: inline-block;
           padding: 2px 6px;
-          background-color: #b5944e;
+          background-color: ${accentColor};
           color: #ffffff;
           border-radius: 4px;
           font-size: 10px;
@@ -601,7 +694,7 @@ export function exportBenefitsToPDF(
           page-break-inside: avoid;
           margin-bottom: 35px;
           padding-bottom: 25px;
-          border-bottom: 1px solid #e8e2d5;
+          border-bottom: 1px solid ${borderColor};
         }
 
         .book-benefit:last-child {
@@ -616,14 +709,14 @@ export function exportBenefitsToPDF(
         }
 
         .book-index {
-          background-color: #1e3a2b;
+          background-color: ${bookPrimary};
           color: #ffffff;
           font-family: 'Tajawal', sans-serif;
           font-size: 11px;
           font-weight: 800;
           padding: 4px 10px;
           border-radius: 4px;
-          border-bottom: 2px solid #b5944e;
+          border-bottom: 2px solid ${bookAccent};
           shrink-0: 0;
         }
 
@@ -631,21 +724,21 @@ export function exportBenefitsToPDF(
           font-family: 'Tajawal', sans-serif;
           font-size: 16px;
           font-weight: 800;
-          color: #1e3a2b;
+          color: ${bookPrimary};
           margin: 0;
         }
 
         .book-benefit-content {
-          font-family: 'Amiri', serif;
+          font-family: ${bookContentFont};
           font-size: 16px;
           line-height: 1.85;
-          color: #111111;
+          color: ${bookTextColor};
           text-align: justify;
           text-indent: 1.2cm;
           white-space: pre-wrap;
           margin-bottom: 18px;
           padding-right: 15px;
-          border-right: 2px solid #f0eae1;
+          border-right: 2px solid ${borderColor}50;
         }
 
         .book-benefit-meta {
@@ -655,17 +748,17 @@ export function exportBenefitsToPDF(
           display: flex;
           flex-wrap: wrap;
           gap: 15px;
-          background-color: #faf8f5;
+          background-color: ${rowEvenColor};
           padding: 8px 15px;
           border-radius: 6px;
-          border-right: 3px solid #b5944e;
+          border-right: 3px solid ${bookAccent};
         }
 
         /* App Metadata Footer */
         .pdf-footer {
           margin-top: 40px;
           padding-top: 15px;
-          border-top: 2px solid #b5944e;
+          border-top: 2px solid ${accentColor};
           text-align: center;
           font-size: 10.5px;
           color: #555;
@@ -675,7 +768,7 @@ export function exportBenefitsToPDF(
         
         .pdf-footer .app-brand {
           font-weight: 800;
-          color: #1e3a2b;
+          color: ${primaryColor};
           font-size: 13px;
           margin-bottom: 4px;
         }
@@ -688,42 +781,63 @@ export function exportBenefitsToPDF(
           }
           
           table {
-            border: 1px solid #1e3a2b;
+            border-collapse: separate;
+            border-spacing: 0;
+            border: 1px solid ${primaryColor} !important;
             width: 100% !important;
           }
           
           th {
-            background-color: #1e3a2b !important;
-            color: #ffffff !important;
+            background-color: ${tableHeaderBg} !important;
+            color: ${tableHeaderTextColor} !important;
+            border-bottom: 1px solid ${borderColor} !important;
+            border-left: 1px solid ${borderColor} !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
+
+          th:last-child {
+            border-left: none !important;
+          }
+
+          td {
+            border-bottom: 1px solid ${borderColor} !important;
+            border-left: 1px solid ${borderColor} !important;
+          }
+
+          td:last-child {
+            border-left: none !important;
+          }
+
+          tr:last-child td {
+            border-bottom: none !important;
+          }
           
           tr:nth-child(even) {
-            background-color: #faf8f5 !important;
+            background-color: ${rowEvenColor} !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
           
           .badge {
-            background-color: #b5944e !important;
+            background-color: ${accentColor} !important;
             color: #ffffff !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
 
           .book-cover {
-            border: 12px double #1e3a2b !important;
-            outline: 2px solid #b5944e !important;
-            background-color: #fcfbfa !important;
+            border: ${bookBorder} !important;
+            outline: ${bookOutline} !important;
+            background-color: ${bookBg} !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
 
           .cover-author-box {
-            background-color: #f4efe2 !important;
-            border-right: 4px solid #1e3a2b !important;
-            border-left: 4px solid #1e3a2b !important;
+            background-color: ${coverAuthorBoxBg} !important;
+            border-right: 4px solid ${bookPrimary} !important;
+            border-left: 4px solid ${bookPrimary} !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
@@ -733,9 +847,9 @@ export function exportBenefitsToPDF(
           font-family: 'Tajawal', sans-serif;
           font-size: 16px;
           font-weight: 900;
-          color: #1e3a2b;
-          background-color: #f7f3e8;
-          border-right: 5px solid #b5944e;
+          color: ${primaryColor};
+          background-color: ${rowEvenColor};
+          border-right: 5px solid ${accentColor};
           padding: 8px 15px;
           margin-top: 35px;
           margin-bottom: 15px;
@@ -749,12 +863,12 @@ export function exportBenefitsToPDF(
 
         .book-category-title {
           font-size: 18px;
-          border-bottom: 2px solid #1e3a2b;
+          border-bottom: 2px solid ${bookPrimary};
           text-align: center;
           border-right: none;
           border-left: none;
-          border-top: 2px solid #1e3a2b;
-          background-color: #fcfbfa;
+          border-top: 2px solid ${bookPrimary};
+          background-color: ${bookBg};
           padding: 10px;
           margin-bottom: 25px;
           -webkit-print-color-adjust: exact;
