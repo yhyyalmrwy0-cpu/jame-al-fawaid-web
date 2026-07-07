@@ -29,6 +29,15 @@ const PORT = 3000;
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+  // Middleware to handle and strip development/preview environment subpath routing (e.g. /1416/api/...)
+  app.use((req, res, next) => {
+    const match = req.url.match(/^\/([^\/]+)(\/api\/.*)$/);
+    if (match) {
+      req.url = match[2];
+    }
+    next();
+  });
+
   // CORS Middleware to allow requests from Vercel or any origin
   app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", "*");

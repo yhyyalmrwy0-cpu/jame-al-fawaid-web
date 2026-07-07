@@ -9,6 +9,10 @@ export const getApiUrl = (path: string): string => {
   // 1. Check if VITE_API_BASE_URL is defined
   let baseUrl = (import.meta as any).env?.VITE_API_BASE_URL || '';
 
+  if (baseUrl === 'RELATIVE' || baseUrl === 'self' || baseUrl === 'relative') {
+    baseUrl = '';
+  }
+
   // 2. Fallback to the permanent Shared App URL if running on a custom external production URL (like Vercel or any custom domain)
   if (!baseUrl && typeof window !== 'undefined') {
     const host = window.location.hostname;
@@ -17,8 +21,14 @@ export const getApiUrl = (path: string): string => {
 
     if (!isLocal && !isStudioPreview) {
       // The app has been exported/deployed externally (e.g. Vercel, Netlify, custom domain).
-      // Connect to the secure, active Cloud Run API gateway container:
-      baseUrl = 'https://ais-pre-nycqmzc2bzipjgz5op6wxm-55449569636.europe-west2.run.app';
+      // If deployed on Vercel, we must use relative path (empty string) to leverage Vercel's serverless functions!
+      const isVercel = host.includes('vercel.app') || host.includes('vercel');
+      if (isVercel) {
+        baseUrl = '';
+      } else {
+        // Connect to the secure, active Cloud Run API gateway container:
+        baseUrl = 'https://ais-pre-nycqmzc2bzipjgz5op6wxm-55449569636.europe-west2.run.app';
+      }
     }
   }
 
