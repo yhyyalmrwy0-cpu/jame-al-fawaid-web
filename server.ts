@@ -44,7 +44,7 @@ const PORT = 3000;
   });
 
   // API Route: OCR and Text Extraction with Gemini
-  app.post("/api/gemini/ocr", async (req, res) => {
+  app.post(["/api/gemini/ocr", "/api/analyze-image"], async (req, res) => {
     try {
       const { image, mimeType } = req.body;
       if (!image) {

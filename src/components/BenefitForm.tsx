@@ -195,7 +195,7 @@ export const BenefitForm: React.FC<BenefitFormProps> = ({
       showToast('جاري إرسال الصورة وقراءتها بالذكاء الاصطناعي (Gemini OCR)... ⏳', 'info');
 
       try {
-        const response = await fetch(getApiUrl('/api/gemini/ocr'), {
+        const response = await fetch(getApiUrl('/api/analyze-image'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

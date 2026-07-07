@@ -6,12 +6,20 @@
       "use": "@vercel/node"
     },
     {
+      "src": "api/analyze-image.js",
+      "use": "@vercel/node"
+    },
+    {
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": { "distDir": "dist" }
     }
   ],
   "routes": [
+    {
+      "src": "/api/analyze-image",
+      "dest": "api/analyze-image.js"
+    },
     {
       "src": "/api/(.*)",
       "dest": "server.ts"
