@@ -1,4 +1,3 @@
-console.log("GEMINI_API_KEY exists:", process.env.GEMINI_API_KEY ? "Yes" : "No");
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -248,11 +247,24 @@ const PORT = 3000;
         return res.status(400).json({ success: false, message: "يرجى تزويد كود التفعيل لتتم عملية التنشيط." });
       }
 
+      const normalizedCode = code.trim().toUpperCase();
+      const MASTER_KEYS = [
+        "ABU-OSID-VIP-7777",
+        "ABU-OSID-GOLD-PRO-9999",
+        "ABU-OSID-MASTER-9999-PREMIUM"
+      ];
+
+      if (MASTER_KEYS.includes(normalizedCode)) {
+        return res.status(200).json({
+          success: true,
+          message: "تم التفعيل بنجاح باستخدام كود المطور الرئيسي المعتمد!"
+        });
+      }
+
       if (!db) {
         return res.status(500).json({ success: false, message: "قاعدة البيانات غير متصلة بالخادم حالياً." });
       }
 
-      const normalizedCode = code.trim().toUpperCase();
       const keyDocRef = doc(db, "activation_keys", normalizedCode);
       const keyDocSnap = await getDoc(keyDocRef);
 
