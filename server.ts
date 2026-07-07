@@ -1,3 +1,4 @@
+console.log("GEMINI_API_KEY exists:", process.env.GEMINI_API_KEY ? "Yes" : "No");
 import express from "express";
 import path from "path";
 import fs from "fs";
