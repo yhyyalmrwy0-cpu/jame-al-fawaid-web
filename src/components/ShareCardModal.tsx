@@ -677,11 +677,11 @@ export const ShareCardModal: React.FC<ShareCardModalProps> = ({
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-zinc-900 border border-zinc-800 rounded-3xl max-w-5xl w-full flex flex-col md:flex-row overflow-hidden text-right font-sans shadow-2xl h-[95vh] md:h-auto md:max-h-[90vh]"
+          className="bg-zinc-900 border border-zinc-800 rounded-3xl max-w-5xl w-full flex flex-col md:flex-row overflow-hidden text-right font-sans shadow-2xl h-[92vh] md:h-[85vh] max-h-[95vh]"
         >
           {/* Left panel: Live Beautiful Card Teaser Preview */}
           <div 
-            className="flex-1 bg-zinc-950 p-6 flex flex-col justify-center items-center border-b md:border-b-0 md:border-l border-zinc-800 overflow-y-auto min-h-[360px] md:min-h-0"
+            className="flex-1 bg-zinc-950 p-4 sm:p-6 flex flex-col justify-center items-center border-b md:border-b-0 md:border-l border-zinc-800 overflow-y-auto h-[45%] md:h-full shrink-0 md:shrink"
             onContextMenu={(e) => e.preventDefault()}
           >
             <span className="text-[10px] text-brand-gold uppercase tracking-wider font-extrabold mb-3 block self-start flex items-center gap-1">
@@ -808,7 +808,7 @@ export const ShareCardModal: React.FC<ShareCardModalProps> = ({
           </div>
 
           {/* Right panel: Controls and premium trigger info */}
-          <div className="w-full md:w-[400px] p-6 flex flex-col justify-between bg-zinc-900 overflow-y-auto">
+          <div className="w-full md:w-[420px] p-4 sm:p-6 flex flex-col justify-between bg-zinc-900 overflow-y-auto h-[55%] md:h-full shrink-0 md:shrink">
             {/* Header */}
             <div className="space-y-5">
               <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
@@ -830,14 +830,14 @@ export const ShareCardModal: React.FC<ShareCardModalProps> = ({
               </div>
 
               {/* Themes Selector */}
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 <span className="text-xs font-bold text-zinc-300 block">قوالب التصميم المتوفرة (اختر لوناً):</span>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2 max-h-[140px] md:max-h-[180px] overflow-y-auto pr-1 scroll-smooth bg-zinc-950/40 p-2 rounded-xl border border-zinc-800/60 scrollbar-thin scrollbar-thumb-zinc-850">
                   {CARD_THEMES.map((theme) => (
                     <button
                       key={theme.id}
                       onClick={() => setSelectedTheme(theme.id)}
-                      className={`p-2.5 rounded-xl border text-right transition-all cursor-pointer flex flex-col justify-between h-20 ${
+                      className={`p-2.5 rounded-xl border text-right transition-all cursor-pointer flex flex-col justify-between h-20 shrink-0 ${
                         selectedTheme === theme.id
                           ? 'bg-brand-emerald/10 border-brand-emerald text-brand-emerald ring-1 ring-brand-emerald/25 shadow-lg'
                           : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:bg-zinc-850 hover:text-zinc-200'
@@ -856,14 +856,14 @@ export const ShareCardModal: React.FC<ShareCardModalProps> = ({
               </div>
 
               {/* Font Family Selector */}
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 <span className="text-xs font-bold text-zinc-300 block">نوع الخط الفني (اختر خطاً فائق الجمال):</span>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2 max-h-[120px] md:max-h-[150px] overflow-y-auto pr-1 scroll-smooth bg-zinc-950/40 p-2 rounded-xl border border-zinc-800/60 scrollbar-thin scrollbar-thumb-zinc-850">
                   {CARD_FONTS.map((font) => (
                     <button
                       key={font.id}
                       onClick={() => setSelectedFont(font.id)}
-                      className={`p-2 rounded-xl border text-right transition-all cursor-pointer flex flex-col justify-between h-16 ${
+                      className={`p-2 rounded-xl border text-right transition-all cursor-pointer flex flex-col justify-between h-16 shrink-0 ${
                         selectedFont === font.id
                           ? 'bg-brand-emerald/10 border-brand-emerald text-brand-emerald ring-1 ring-brand-emerald/25 shadow-lg'
                           : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:bg-zinc-850 hover:text-zinc-200'
