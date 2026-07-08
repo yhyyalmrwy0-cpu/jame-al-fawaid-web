@@ -27,6 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [copied, setCopied] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(settings.programmerName);
+  const [isDailyBenefitHidden, setIsDailyBenefitHidden] = useState(false);
 
   const [isHolding, setIsHolding] = useState(false);
   const timerRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -63,17 +64,10 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const cancelHold = (e: React.MouseEvent | React.TouchEvent) => {
-    const holdDuration = Date.now() - holdStartTimeRef.current;
-
     if (isHolding) {
       setIsHolding(false);
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = null;
-
-      // If duration is less than 500ms, perform a regular click to edit the name
-      if (holdDuration < 500) {
-        setIsEditingName(true);
-      }
     }
   };
 
@@ -91,17 +85,74 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const selectRandomBenefit = () => {
-    if (benefits.length > 0) {
-      const randomIndex = Math.floor(Math.random() * benefits.length);
-      setRandomBenefit(benefits[randomIndex]);
-    } else {
+    if (benefits.length === 0) {
       setRandomBenefit(null);
+      return;
+    }
+
+    try {
+      // Get already shown benefit IDs
+      const storedShown = localStorage.getItem('abuosid_shown_benefit_ids');
+      let shownIds: string[] = [];
+      if (storedShown) {
+        shownIds = JSON.parse(storedShown);
+      }
+
+      // Filter benefits that haven't been shown yet
+      let unshownBenefits = benefits.filter(b => !shownIds.includes(b.id));
+
+      // If all have been shown (or something went wrong), reset the list
+      if (unshownBenefits.length === 0) {
+        shownIds = [];
+        unshownBenefits = [...benefits];
+      }
+
+      // Pick a random benefit from the unshown ones
+      const randomIndex = Math.floor(Math.random() * unshownBenefits.length);
+      const chosenBenefit = unshownBenefits[randomIndex];
+
+      if (chosenBenefit) {
+        // Record this benefit as shown
+        shownIds.push(chosenBenefit.id);
+        localStorage.setItem('abuosid_shown_benefit_ids', JSON.stringify(shownIds));
+        localStorage.setItem('abuosid_current_daily_benefit_id', chosenBenefit.id);
+        
+        // Save today's date
+        const todayStr = new Date().toDateString();
+        localStorage.setItem('abuosid_current_daily_benefit_date', todayStr);
+        
+        setRandomBenefit(chosenBenefit);
+      }
+    } catch (error) {
+      console.error('Error selecting random benefit:', error);
+      const randomIndex = Math.floor(Math.random() * benefits.length);
+      const fallback = benefits[randomIndex] || null;
+      setRandomBenefit(fallback);
+      if (fallback) {
+        localStorage.setItem('abuosid_current_daily_benefit_id', fallback.id);
+      }
     }
   };
 
-  // Select a random benefit on mount or when the benefits list changes from empty to populated
+  // Select a random benefit on mount or when the benefits list changes
   useEffect(() => {
-    selectRandomBenefit();
+    if (benefits.length > 0) {
+      const savedId = localStorage.getItem('abuosid_current_daily_benefit_id');
+      const savedDate = localStorage.getItem('abuosid_current_daily_benefit_date');
+      const todayStr = new Date().toDateString();
+      
+      const found = benefits.find(b => b.id === savedId);
+      
+      // If it exists AND it's still the same day, restore it!
+      // Otherwise (different day, or no saved benefit, or benefit deleted), select a new one.
+      if (found && savedDate === todayStr) {
+        setRandomBenefit(found);
+      } else {
+        selectRandomBenefit();
+      }
+    } else {
+      setRandomBenefit(null);
+    }
   }, [benefits.length]);
 
   const handleCopy = (e: React.MouseEvent) => {
@@ -120,7 +171,17 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Top Banner and Counter */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-gradient-to-l from-brand-emerald-dark to-brand-emerald p-6 rounded-2xl text-white border border-brand-gold/20 custom-shadow">
         <div className="flex items-center gap-4 text-center sm:text-right">
-          <AppLogo className="w-14 h-14 shrink-0" />
+          <div
+            onMouseDown={startHold}
+            onMouseUp={cancelHold}
+            onMouseLeave={cancelHold}
+            onTouchStart={startHold}
+            onTouchEnd={cancelHold}
+            className="cursor-pointer select-none active:scale-95 transition-transform"
+            title="شعار التطبيق (اضغط مطولاً لخيارات المطور)"
+          >
+            <AppLogo className="w-14 h-14 shrink-0" />
+          </div>
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold font-sans tracking-tight text-brand-cream flex items-center gap-2 justify-center sm:justify-start">
               جامع الفوائد
@@ -172,13 +233,10 @@ export const Header: React.FC<HeaderProps> = ({
                     {settings.programmerName}
                   </span>
                   <button
-                    onMouseDown={startHold}
-                    onMouseUp={cancelHold}
-                    onMouseLeave={cancelHold}
-                    onTouchStart={startHold}
-                    onTouchEnd={cancelHold}
+                    onClick={() => setIsEditingName(true)}
                     className="p-1.5 bg-white/5 hover:bg-white/15 text-zinc-300 hover:text-brand-gold-light rounded-lg transition-colors cursor-pointer"
                     title="تعديل هذا الاسم"
+                    id="edit-username-button"
                   >
                     <PenLine className="w-3.5 h-3.5" />
                   </button>
@@ -226,68 +284,104 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Random Daily Benefit Segment */}
       <AnimatePresence mode="wait">
         {randomBenefit && (
-          <motion.div
-            key={randomBenefit.id}
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            transition={{ duration: 0.4 }}
-            className="bg-brand-beige border-r-4 border-r-brand-gold border border-brand-cream/40 rounded-2xl p-5 custom-shadow-gold relative overflow-hidden cursor-pointer hover:border-brand-gold/60 transition-all group"
-            onClick={() => onViewBenefit(randomBenefit)}
-          >
-            {/* Background design elements */}
-            <div className="absolute -top-10 -left-10 w-24 h-24 bg-brand-cream/20 rounded-full blur-2xl" />
-            
-            <div className="flex items-center justify-between mb-3 border-b border-brand-cream/55 pb-2.5">
-              <div className="flex items-center gap-2 text-brand-emerald">
-                <Sparkles className="w-5 h-5 text-brand-gold animate-pulse" />
-                <span className="text-sm font-bold tracking-wide">💡 فائدة اليوم العشوائية</span>
+          isDailyBenefitHidden ? (
+            <motion.button
+              key="show-daily-benefit-btn"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+              onClick={() => {
+                selectRandomBenefit();
+                setIsDailyBenefitHidden(false);
+              }}
+              className="w-full bg-gradient-to-r from-brand-emerald-dark to-brand-emerald text-white hover:text-brand-cream font-extrabold py-4 px-6 rounded-2xl border border-brand-gold/25 flex items-center justify-center gap-3 shadow-md hover:shadow-lg active:scale-[0.99] transition-all duration-200 cursor-pointer font-sans"
+            >
+              <Sparkles className="w-5 h-5 text-brand-gold animate-pulse shrink-0" />
+              <span className="text-sm sm:text-base tracking-wide">عرض فائدة اليوم 💡</span>
+            </motion.button>
+          ) : (
+            <motion.div
+              key={randomBenefit.id}
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.4 }}
+              className="bg-gradient-to-br from-brand-beige to-[#FBF9F3] border-r-4 border-brand-emerald border-y border-l border-brand-emerald/15 rounded-2xl p-6 custom-shadow-gold relative overflow-hidden cursor-pointer hover:border-brand-emerald/30 hover:shadow-lg transition-all duration-300 group"
+              onClick={() => {
+                onViewBenefit(randomBenefit);
+                setIsDailyBenefitHidden(true);
+              }}
+            >
+              {/* Elegant Background Islamic star and ornament */}
+              <div className="absolute -top-12 -left-12 w-28 h-28 bg-brand-gold/10 rounded-full blur-2xl group-hover:bg-brand-gold/15 transition-all duration-300" />
+              <div className="absolute top-3 left-3 w-16 h-16 opacity-[0.03] group-hover:opacity-[0.06] transition-opacity duration-300 pointer-events-none select-none">
+                <svg viewBox="0 0 100 100" className="w-full h-full text-brand-emerald fill-current">
+                  <path d="M50 0 L61 35 L98 35 L68 57 L79 91 L50 70 L21 91 L32 57 L2 35 L39 35 Z" />
+                </svg>
               </div>
               
-              <div className="flex items-center gap-2">
-                {/* Copy Button */}
-                <button
-                  onClick={handleCopy}
-                  className="p-1.5 text-zinc-500 hover:text-brand-emerald hover:bg-brand-cream/50 rounded-lg transition-all"
-                  title="نسخ الفائدة"
-                >
-                  {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-                </button>
+              {/* Inset elegant thin border line to feel like a manuscript frame */}
+              <div className="absolute inset-1.5 border border-brand-gold/10 rounded-xl pointer-events-none" />
 
-                {/* Refresh Button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    selectRandomBenefit();
-                  }}
-                  className="p-1.5 text-zinc-500 hover:text-brand-emerald hover:bg-brand-cream/50 rounded-lg transition-all"
-                  title="فائدة عشوائية أخرى"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </button>
+              <div className="relative flex items-center justify-between mb-4 border-b border-brand-cream/70 pb-3 z-10">
+                <div className="flex items-center gap-2.5 text-brand-emerald">
+                  <div className="w-7 h-7 rounded-lg bg-brand-emerald/5 flex items-center justify-center border border-brand-emerald/10">
+                    <Sparkles className="w-4 h-4 text-brand-gold animate-pulse" />
+                  </div>
+                  <span className="text-sm font-black tracking-wide font-sans text-brand-emerald-dark">💡 فائدة اليوم</span>
+                </div>
+                
+                <div className="flex items-center gap-1.5 relative z-20">
+                  {/* Copy Button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCopy(e);
+                    }}
+                    className="p-2 text-zinc-500 hover:text-brand-emerald hover:bg-brand-emerald/5 rounded-xl transition-all active:scale-90 cursor-pointer"
+                    title="نسخ الفائدة"
+                  >
+                    {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                  </button>
+
+                  {/* Refresh Button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      selectRandomBenefit();
+                    }}
+                    className="p-2 text-zinc-500 hover:text-brand-emerald hover:bg-brand-emerald/5 rounded-xl transition-all active:rotate-180 duration-500 active:scale-90 cursor-pointer"
+                    title="تصفح فائدة أخرى"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <div className="space-y-3">
-              <h3 className="text-base font-bold text-brand-emerald-dark leading-snug group-hover:text-brand-emerald transition-colors line-clamp-1">
-                {randomBenefit.title}
-              </h3>
-              <p className="text-sm text-zinc-700 leading-relaxed font-serif line-clamp-3">
-                {randomBenefit.content}
-              </p>
-              
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-2">
-                <span className="px-2.5 py-1 bg-brand-cream text-brand-emerald font-semibold rounded-lg">
-                  {randomBenefit.category}
-                </span>
-                {randomBenefit.source && (
-                  <span className="text-zinc-500 font-sans">
-                    المصدر: <span className="font-medium text-brand-emerald">{randomBenefit.source}</span>
+              <div className="relative space-y-3.5 z-10">
+                <h3 className="text-base sm:text-lg font-extrabold text-brand-emerald-dark leading-snug group-hover:text-brand-emerald transition-colors line-clamp-1">
+                  {randomBenefit.title}
+                </h3>
+                
+                {/* Refined frame for the quote block inside the daily benefit card */}
+                <p className="text-sm sm:text-base text-zinc-800 leading-relaxed font-serif line-clamp-4 pr-3.5 border-r-2 border-brand-emerald/20 group-hover:border-brand-emerald/40 transition-colors">
+                  {randomBenefit.content}
+                </p>
+                
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-3 border-t border-brand-cream/40">
+                  <span className="px-3 py-1 bg-brand-emerald/5 text-brand-emerald font-bold rounded-lg border border-brand-emerald/10">
+                    {randomBenefit.category}
                   </span>
-                )}
+                  {randomBenefit.source && (
+                    <span className="text-zinc-500 font-sans">
+                      المصدر: <span className="font-bold text-brand-emerald-dark">{randomBenefit.source}</span>
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          )
         )}
       </AnimatePresence>
     </div>

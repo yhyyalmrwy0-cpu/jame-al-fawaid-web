@@ -89,6 +89,7 @@ const compressImage = (
 interface BenefitFormProps {
   onSave: (benefit: Omit<Benefit, 'id' | 'views' | 'isFavorite' | 'createdAt'>) => void;
   initialBenefit?: Benefit | null;
+  prefilledData?: Omit<Benefit, 'id' | 'views' | 'isFavorite' | 'createdAt'> | null;
   onCancel?: () => void;
   showToast: (msg: string, type: 'success' | 'info' | 'warning') => void;
 }
@@ -96,6 +97,7 @@ interface BenefitFormProps {
 export const BenefitForm: React.FC<BenefitFormProps> = ({
   onSave,
   initialBenefit,
+  prefilledData,
   onCancel,
   showToast,
 }) => {
@@ -250,13 +252,19 @@ export const BenefitForm: React.FC<BenefitFormProps> = ({
       setSource(initialBenefit.source);
       setCategory(initialBenefit.category as CategoryType);
       setDate(initialBenefit.date);
+    } else if (prefilledData) {
+      setTitle(prefilledData.title);
+      setContent(prefilledData.content);
+      setSource(prefilledData.source);
+      setCategory(prefilledData.category as CategoryType);
+      setDate(prefilledData.date);
     } else {
       // Default to today's date
       const today = new Date();
       const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
       setDate(formattedDate);
     }
-  }, [initialBenefit]);
+  }, [initialBenefit, prefilledData]);
 
   // Set up Speech Recognition
   useEffect(() => {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { AlertTriangle, CheckCircle2, Trash, Edit, Plus, Save, X, BookOpen, Calendar, HelpCircle, CheckSquare, Square } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Trash, Edit, Plus, Save, X, BookOpen, Calendar, HelpCircle, CheckSquare, Square, Mic, MicOff, Sparkles } from 'lucide-react';
 import { ScientificQuery } from '../types';
 import { formatToHijriAndGregorian } from '../utils';
 
@@ -9,6 +9,7 @@ interface QueryManagerProps {
   onAddQuery: (query: Omit<ScientificQuery, 'id' | 'createdAt'>) => void;
   onUpdateQuery: (query: ScientificQuery) => void;
   onDeleteQuery: (id: string) => void;
+  onConvertToBenefit: (query: ScientificQuery) => void;
   showToast: (msg: string, type: 'success' | 'info' | 'warning') => void;
 }
 
@@ -17,6 +18,7 @@ export const QueryManager: React.FC<QueryManagerProps> = ({
   onAddQuery,
   onUpdateQuery,
   onDeleteQuery,
+  onConvertToBenefit,
   showToast,
 }) => {
   const [isAdding, setIsAdding] = useState(false);
@@ -35,6 +37,141 @@ export const QueryManager: React.FC<QueryManagerProps> = ({
 
   // Filter state
   const [filter, setFilter] = useState<'all' | 'unresolved' | 'resolved'>('all');
+
+  // Speech and Inline Resolution states
+  const [listeningField, setListeningField] = useState<'title' | 'content' | null>(null);
+  const [solvingQueryId, setSolvingQueryId] = useState<string | null>(null);
+  const [inlineResolution, setInlineResolution] = useState('');
+  const [isListeningResolution, setIsListeningResolution] = useState(false);
+
+  const startVoiceInput = (field: 'title' | 'content') => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      showToast('المتصفح الحالي لا يدعم ميزة الإدخال الصوتي.', 'warning');
+      return;
+    }
+
+    if (listeningField === field) {
+      setListeningField(null);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.lang = 'ar-SA';
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        setListeningField(field);
+        showToast('جاري الاستماع... تحدث باللغة العربية الآن 🎙️', 'info');
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setListeningField(null);
+        if (event.error === 'not-allowed') {
+          showToast('تم رفض إذن الوصول للميكروفون! يرجى تفعيله من إعدادات المتصفح.', 'warning');
+        } else {
+          showToast('فشل التعرف على الصوت، يرجى المحاولة مجدداً.', 'warning');
+        }
+      };
+
+      recognition.onend = () => {
+        setListeningField(null);
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        if (transcript) {
+          if (field === 'title') {
+            setTitle(prev => prev ? `${prev} ${transcript}` : transcript);
+          } else {
+            setContent(prev => prev ? `${prev} ${transcript}` : transcript);
+          }
+          showToast('تم تسجيل النص بنجاح ✨', 'success');
+        }
+      };
+
+      recognition.start();
+    } catch (e) {
+      console.error(e);
+      showToast('حدث خطأ أثناء تشغيل ميزة التعرف على الصوت.', 'warning');
+      setListeningField(null);
+    }
+  };
+
+  const startVoiceInputForResolution = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      showToast('المتصفح الحالي لا يدعم ميزة الإدخال الصوتي.', 'warning');
+      return;
+    }
+
+    if (isListeningResolution) {
+      setIsListeningResolution(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.lang = 'ar-SA';
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        setIsListeningResolution(true);
+        showToast('جاري الاستماع للتحقيق العلمي... تحدث الآن 🎙️', 'info');
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListeningResolution(false);
+        if (event.error === 'not-allowed') {
+          showToast('تم رفض إذن الوصول للميكروفون! يرجى تفعيله من إعدادات المتصفح.', 'warning');
+        } else {
+          showToast('فشل التعرف على الصوت، يرجى المحاولة مجدداً.', 'warning');
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListeningResolution(false);
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        if (transcript) {
+          setInlineResolution(prev => prev ? `${prev} ${transcript}` : transcript);
+          showToast('تم إضافة التحقيق الصوتي بنجاح ✨', 'success');
+        }
+      };
+
+      recognition.start();
+    } catch (e) {
+      console.error(e);
+      showToast('حدث خطأ أثناء تشغيل ميزة التعرف على الصوت.', 'warning');
+      setIsListeningResolution(false);
+    }
+  };
+
+  const handleSaveInlineResolution = (q: ScientificQuery) => {
+    if (!inlineResolution.trim()) {
+      showToast('يرجى كتابة التحقيق العلمي أولاً لإقفال الاستشكال!', 'warning');
+      return;
+    }
+
+    onUpdateQuery({
+      ...q,
+      isResolved: true,
+      resolution: inlineResolution.trim(),
+    });
+
+    setSolvingQueryId(null);
+    setInlineResolution('');
+    showToast('الحمد لله! تم حل الاستشكال بنجاح وتوثيق مخرجه العلمي.', 'success');
+  };
 
   const openAddForm = () => {
     setTitle('');
@@ -167,25 +304,53 @@ export const QueryManager: React.FC<QueryManagerProps> = ({
               {/* Title input */}
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-zinc-700">عنوان الاستشكال العلمي *</label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="مثال: تعارض ظاهر حديث الآحاد مع عموم القرآن في مسألة..."
-                  className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-sans text-sm text-zinc-800 bg-zinc-50/50"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="مثال: تعارض ظاهر حديث الآحاد مع عموم القرآن في مسألة..."
+                    className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-sans text-sm text-zinc-800 bg-zinc-50/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => startVoiceInput('title')}
+                    className={`absolute left-3 top-2.5 p-1 rounded-lg transition-all cursor-pointer ${
+                      listeningField === 'title' 
+                        ? 'text-red-600 bg-red-50 animate-pulse ring-2 ring-red-200' 
+                        : 'text-zinc-400 hover:text-brand-emerald hover:bg-zinc-100'
+                    }`}
+                    title="إدخال صوتي باللغة العربية"
+                  >
+                    {listeningField === 'title' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               {/* Content input */}
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-zinc-700">نص الاستشكال واللبس بالتفصيل *</label>
-                <textarea
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="وضح المسألة والوجه الذي وقع فيه الإشكال بدقة وعناية..."
-                  rows={4}
-                  className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-serif text-sm text-zinc-800 bg-zinc-50/50 leading-relaxed"
-                />
+                <div className="relative">
+                  <textarea
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    placeholder="وضح المسألة والوجه الذي وقع فيه الإشكال بدقة وعناية..."
+                    rows={4}
+                    className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-serif text-sm text-zinc-800 bg-zinc-50/50 leading-relaxed"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => startVoiceInput('content')}
+                    className={`absolute left-3 top-3 p-1 rounded-lg transition-all cursor-pointer ${
+                      listeningField === 'content' 
+                        ? 'text-red-600 bg-red-50 animate-pulse ring-2 ring-red-200' 
+                        : 'text-zinc-400 hover:text-brand-emerald hover:bg-zinc-100'
+                    }`}
+                    title="إدخال صوتي باللغة العربية"
+                  >
+                    {listeningField === 'content' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               {/* Grid: Source & Date */}
@@ -363,18 +528,25 @@ export const QueryManager: React.FC<QueryManagerProps> = ({
                   <span className="text-xs text-zinc-500 font-sans hidden sm:inline-block bg-zinc-100 px-2 py-0.5 rounded-md border border-zinc-200">{formatToHijriAndGregorian(q.date)}</span>
                   {/* Toggle resolve button */}
                   <button
-                    onClick={() => toggleResolveStatus(q)}
-                    className={`p-1.5 rounded-lg hover:bg-zinc-100 transition-all ${
-                      q.isResolved ? 'text-emerald-600' : 'text-zinc-400'
+                    onClick={() => {
+                      if (!q.isResolved) {
+                        setSolvingQueryId(q.id);
+                        setInlineResolution('');
+                      } else {
+                        toggleResolveStatus(q);
+                      }
+                    }}
+                    className={`p-1.5 rounded-lg hover:bg-zinc-100 transition-all cursor-pointer ${
+                      q.isResolved ? 'text-emerald-600' : 'text-zinc-400 hover:text-emerald-600'
                     }`}
-                    title={q.isResolved ? 'إعادة فتح الاستشكال' : 'تحديد كتم حل الاستشكال'}
+                    title={q.isResolved ? 'إعادة فتح الاستشكال' : 'كتابة تحقيق علمي لحل الاستشكال'}
                   >
                     {q.isResolved ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
                   </button>
                   {/* Edit button */}
                   <button
                     onClick={() => openEditForm(q)}
-                    className="p-1.5 text-zinc-400 hover:text-brand-emerald hover:bg-zinc-100 rounded-lg transition-all"
+                    className="p-1.5 text-zinc-400 hover:text-brand-emerald hover:bg-zinc-100 rounded-lg transition-all cursor-pointer"
                     title="تعديل"
                   >
                     <Edit className="w-4 h-4" />
@@ -382,7 +554,7 @@ export const QueryManager: React.FC<QueryManagerProps> = ({
                   {/* Delete button */}
                   <button
                     onClick={() => setDeleteId(q.id)}
-                    className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-zinc-100 rounded-lg transition-all"
+                    className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-zinc-100 rounded-lg transition-all cursor-pointer"
                     title="حذف الاستشكال"
                   >
                     <Trash className="w-4 h-4" />
@@ -401,16 +573,105 @@ export const QueryManager: React.FC<QueryManagerProps> = ({
                   </p>
                 </div>
 
+                {/* Direct Solve button if not resolved */}
+                {!q.isResolved && solvingQueryId !== q.id && (
+                  <div className="pt-2 border-t border-zinc-100 flex justify-end">
+                    <button
+                      onClick={() => {
+                        setSolvingQueryId(q.id);
+                        setInlineResolution('');
+                      }}
+                      className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-brand-gold-light" />
+                      <span>حل الاستشكال وتدوين التحقيق العلمي</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Inline resolve form */}
+                {solvingQueryId === q.id && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="p-4 bg-emerald-50/20 rounded-xl border border-emerald-100 space-y-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <h5 className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        التحقيق العلمي وحل الإشكال المعتمد
+                      </h5>
+                      <button
+                        onClick={() => setSolvingQueryId(null)}
+                        className="text-zinc-400 hover:text-zinc-600 p-0.5"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    
+                    <div className="relative">
+                      <textarea
+                        value={inlineResolution}
+                        onChange={(e) => setInlineResolution(e.target.value)}
+                        placeholder="اكتب هنا التحقيق وجواب أهل العلم والنتيجة التي انشرح صدرك لها وحلت الإشكال..."
+                        rows={3}
+                        className="w-full pl-11 pr-3 py-2 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-serif text-xs text-zinc-800 bg-white leading-relaxed"
+                      />
+                      <button
+                        type="button"
+                        onClick={startVoiceInputForResolution}
+                        className={`absolute left-3 top-2.5 p-1 rounded-lg transition-all cursor-pointer ${
+                          isListeningResolution 
+                            ? 'text-red-600 bg-red-50 animate-pulse ring-2 ring-red-200' 
+                            : 'text-zinc-400 hover:text-brand-emerald hover:bg-zinc-100'
+                        }`}
+                        title="إدخال صوتي باللغة العربية"
+                      >
+                        {isListeningResolution ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                      </button>
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => setSolvingQueryId(null)}
+                        className="px-3 py-1.5 text-[11px] font-semibold text-zinc-500 hover:bg-zinc-100 rounded-lg transition-all"
+                      >
+                        إلغاء
+                      </button>
+                      <button
+                        onClick={() => handleSaveInlineResolution(q)}
+                        className="px-4 py-1.5 bg-brand-emerald hover:bg-brand-emerald-light text-white text-[11px] font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        <span>حفظ واعتماد الحل</span>
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+
                 {/* Display resolution box if solved */}
                 {q.isResolved && q.resolution && (
-                  <div className="p-4 bg-emerald-50/40 rounded-xl border border-emerald-100 text-right">
-                    <h5 className="text-xs font-bold text-emerald-800 mb-1.5 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      التحقيق والمخرج العلمي المعتمد:
-                    </h5>
-                    <p className="text-xs sm:text-sm text-zinc-800 leading-relaxed font-serif whitespace-pre-line">
-                      {q.resolution}
-                    </p>
+                  <div className="p-4 bg-emerald-50/40 rounded-xl border border-emerald-100 text-right space-y-3">
+                    <div>
+                      <h5 className="text-xs font-bold text-emerald-800 mb-1.5 flex items-center gap-1.5 font-sans">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        التحقيق والمخرج العلمي المعتمد:
+                      </h5>
+                      <p className="text-xs sm:text-sm text-zinc-800 leading-relaxed font-serif whitespace-pre-line">
+                        {q.resolution}
+                      </p>
+                    </div>
+
+                    <div className="flex justify-end pt-2 border-t border-emerald-100/40 gap-2">
+                      <button
+                        onClick={() => onConvertToBenefit(q)}
+                        className="px-3 py-2 bg-gradient-to-r from-brand-emerald to-brand-emerald-dark hover:from-brand-emerald-light hover:to-brand-emerald text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all hover:shadow active:scale-95 cursor-pointer"
+                        title="إدراج هذا التحقيق العلمي كفائدة مستقلة في السجل الرئيسي"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-brand-gold-light animate-pulse" />
+                        <span>إضافته كفائدة 📚</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

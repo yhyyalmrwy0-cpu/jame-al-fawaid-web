@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Heart, Eye, Share2, Edit, Trash, Copy, Check, ChevronDown, ChevronUp, BookOpen, Calendar, Tag, Sparkles } from 'lucide-react';
 import { Benefit } from '../types';
-import { formatToHijriAndGregorian } from '../utils';
+import { formatToHijriAndGregorian, getArabicSearchRegex } from '../utils';
 
 interface BenefitCardProps {
   benefit: Benefit;
@@ -13,6 +13,40 @@ interface BenefitCardProps {
   showToast: (msg: string, type: 'success' | 'info' | 'warning') => void;
   onOpenShareCard: (benefit: Benefit) => void;
   forceExpanded?: boolean;
+  searchQuery?: string;
+}
+
+// Helper to highlight matching text in yellow
+function highlightText(text: string, query: string | undefined): React.ReactNode {
+  if (!text) return '';
+  if (!query || !query.trim()) return text;
+
+  const regex = getArabicSearchRegex(query);
+  if (!regex) return text;
+
+  const parts = text.split(regex);
+
+  return (
+    <>
+      {parts.map((part, index) => {
+        // Reset the regex index before testing because of the global 'g' flag
+        regex.lastIndex = 0;
+        const isMatch = regex.test(part);
+        
+        if (isMatch) {
+          return (
+            <mark
+              key={index}
+              className="bg-yellow-200 text-yellow-950 font-bold px-0.5 rounded-sm"
+            >
+              {part}
+            </mark>
+          );
+        }
+        return <React.Fragment key={index}>{part}</React.Fragment>;
+      })}
+    </>
+  );
 }
 
 export const BenefitCard: React.FC<BenefitCardProps> = ({
@@ -24,6 +58,7 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
   showToast,
   onOpenShareCard,
   forceExpanded,
+  searchQuery,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -101,12 +136,14 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-1 bg-brand-cream/40 text-brand-emerald font-bold rounded-lg flex items-center gap-1">
                 <Tag className="w-3.5 h-3.5 text-brand-gold shrink-0" />
-                {benefit.category}
+                {highlightText(benefit.category, searchQuery)}
               </span>
               
               {benefit.source && (
-                <span className="text-zinc-500 font-sans truncate max-w-[150px] sm:max-w-xs font-medium">
-                  المصدر: {benefit.source}
+                <span className={`text-zinc-500 font-sans font-medium ${
+                  isExpanded ? 'break-words' : 'truncate max-w-[150px] sm:max-w-xs'
+                }`}>
+                  المصدر: {highlightText(benefit.source, searchQuery)}
                 </span>
               )}
             </div>
@@ -133,7 +170,7 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
           {/* Title and views counter */}
           <div className="flex items-start justify-between gap-4">
             <h3 className="text-base sm:text-lg font-bold text-brand-emerald-dark font-sans leading-snug">
-              {benefit.title}
+              {highlightText(benefit.title, searchQuery)}
             </h3>
             
             <div className="flex items-center gap-1.5 text-zinc-400 font-sans text-xs pt-1 shrink-0">
@@ -145,7 +182,7 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
           {/* Summarized preview text if collapsed */}
           {!isExpanded && (
             <p className="text-sm text-zinc-600 line-clamp-2 leading-relaxed font-serif pt-1">
-              {benefit.content}
+              {highlightText(benefit.content, searchQuery)}
             </p>
           )}
 
@@ -160,14 +197,14 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
                 style={{ overflow: 'visible' }}
               >
                 <p className="text-base text-zinc-800 font-serif leading-loose whitespace-pre-line bg-brand-beige/40 p-4 rounded-xl border border-brand-cream/30 select-text">
-                  {benefit.content}
+                  {highlightText(benefit.content, searchQuery)}
                 </p>
 
                 {/* Date & Metadata footer */}
                 <div className="flex flex-wrap items-center justify-between gap-4 pt-4 mt-2 text-xs border-t border-zinc-100 text-zinc-500">
                   <div className="flex items-center gap-1.5 font-sans">
                     <Calendar className="w-4 h-4 text-brand-gold" />
-                    <span>تاريخ التدوين: {formatToHijriAndGregorian(benefit.date)}</span>
+                    <span>تاريخ التدوين: {highlightText(formatToHijriAndGregorian(benefit.date), searchQuery)}</span>
                   </div>
 
                   {/* Operational Toolbar */}

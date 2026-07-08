@@ -83,7 +83,7 @@ export const AndroidSystemNotification: React.FC<AndroidSystemNotificationProps>
           </div>
           <div className="flex-1">
             <h4 className="text-sm font-bold text-brand-gold-light leading-tight line-clamp-1">
-              تنبيه بفائدة عشوائية: {benefit.title}
+              تنبيه بفائدة اليوم: {benefit.title}
             </h4>
             <p className="text-xs text-zinc-300 mt-1 line-clamp-2 leading-relaxed font-serif">
               {benefit.content}

@@ -946,3 +946,70 @@ export function exportBenefitsToPDF(
   printWindow.document.write(htmlContent);
   printWindow.document.close();
 }
+
+/**
+ * Generates a regular expression for smart Arabic search.
+ * It ignores tashkeel (diacritics), standardizes hamzas, converts Arabic/Eastern and Western digits interchangeably,
+ * and matches space with punctuation/spaces.
+ */
+export function getArabicSearchRegex(query: string): RegExp | null {
+  if (!query || !query.trim()) return null;
+  
+  // Clean the query: trim and normalize spacing
+  const cleanQuery = query.trim().replace(/\s+/g, ' ');
+  if (!cleanQuery) return null;
+  
+  // Strip diacritics from the search query itself first so they don't interfere
+  const diacriticsRemoved = cleanQuery.replace(/[\u064B-\u065F\u0670]/g, '');
+  
+  let regexStr = '';
+  
+  for (let i = 0; i < diacriticsRemoved.length; i++) {
+    const char = diacriticsRemoved[i];
+    
+    if (/[اأإآٱ]/.test(char)) {
+      regexStr += '[اأإآٱ][\\u064B-\\u065F\\u0670]*';
+    } else if (/[هة]/.test(char)) {
+      regexStr += '[هة][\\u064B-\\u065F\\u0670]*';
+    } else if (/[يىئ]/.test(char)) {
+      regexStr += '[يىئ][\\u064B-\\u065F\\u0670]*';
+    } else if (/[وؤ]/.test(char)) {
+      regexStr += '[وؤ][\\u064B-\\u065F\\u0670]*';
+    } else if (char === 'ء') {
+      regexStr += '[ءأإآؤئ][\\u064B-\\u065F\\u0670]*';
+    } else if (/[0٠]/.test(char)) {
+      regexStr += '[0٠]';
+    } else if (/[1١]/.test(char)) {
+      regexStr += '[1١]';
+    } else if (/[2٢]/.test(char)) {
+      regexStr += '[2٢]';
+    } else if (/[3٣]/.test(char)) {
+      regexStr += '[3٣]';
+    } else if (/[4٤]/.test(char)) {
+      regexStr += '[4٤]';
+    } else if (/[5٥]/.test(char)) {
+      regexStr += '[5٥]';
+    } else if (/[6٦]/.test(char)) {
+      regexStr += '[6٦]';
+    } else if (/[7٧]/.test(char)) {
+      regexStr += '[7٧]';
+    } else if (/[8٨]/.test(char)) {
+      regexStr += '[8٨]';
+    } else if (/[9٩]/.test(char)) {
+      regexStr += '[9٩]';
+    } else if (char === ' ') {
+      regexStr += '[\\s\\u060C,\\-\\.\\_\\(\\)\\!\\?\\؟]*\\s+';
+    } else {
+      const escaped = char.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      regexStr += `${escaped}[\\u064B-\\u065F\\u0670]*`;
+    }
+  }
+  
+  try {
+    return new RegExp(`(${regexStr})`, 'gi');
+  } catch (e) {
+    console.error('Error creating Arabic search regex:', e);
+    return null;
+  }
+}
+

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { BookOpen, HelpCircle, FolderSync, PlusCircle, Search, Heart, SlidersHorizontal, Grid, Star, Sparkles, Layers, Eye, ArrowUp } from 'lucide-react';
+import { BookOpen, HelpCircle, FolderSync, PlusCircle, Search, Heart, SlidersHorizontal, Grid, Star, Sparkles, Layers, Eye, ArrowUp, X } from 'lucide-react';
 
 // Import Types
 import { Benefit, ScientificQuery, AppSettings, CATEGORIES, CategoryType } from './types';
@@ -18,6 +18,7 @@ import { ShareCardModal } from './components/ShareCardModal';
 import { PremiumPromoModal } from './components/PremiumPromoModal';
 import { WelcomeModal } from './components/WelcomeModal';
 import { getApiUrl } from './utils/api';
+import { getArabicSearchRegex, formatToHijriAndGregorian } from './utils';
 
 // Initial Starter Data for visual polish and immediate functionality on load
 const STARTER_BENEFITS: Benefit[] = [
@@ -419,6 +420,9 @@ export default function App() {
 
   // Active editing states
   const [editingBenefit, setEditingBenefit] = useState<Benefit | null>(null);
+  const [prefilledBenefit, setPrefilledBenefit] = useState<Omit<Benefit, 'id' | 'views' | 'isFavorite' | 'createdAt'> | null>(null);
+  const [convertingQueryId, setConvertingQueryId] = useState<string | null>(null);
+  const [isDoubtBannerDismissed, setIsDoubtBannerDismissed] = useState(false);
 
   // Record visit on startup once per browser session
   useEffect(() => {
@@ -546,6 +550,13 @@ export default function App() {
         createdAt: Date.now(),
       };
       setBenefits(prev => [newBenefit, ...prev]);
+
+      if (convertingQueryId) {
+        setQueries(prev => prev.filter(q => q.id !== convertingQueryId));
+        setConvertingQueryId(null);
+        setPrefilledBenefit(null);
+        showToast('تم بحمد الله قيد الفائدة بنجاح، وإقفال الاستشكال وحذفه تلقائياً من المنصة 🎉📚', 'success');
+      }
     }
   };
 
@@ -607,6 +618,22 @@ export default function App() {
 
   const handleDeleteQuery = (id: string) => {
     setQueries(prev => prev.filter(q => q.id !== id));
+  };
+
+  const handleConvertToBenefit = (query: ScientificQuery) => {
+    if (!query.resolution) return;
+    
+    setPrefilledBenefit({
+      title: query.title,
+      content: query.resolution,
+      category: 'علوم أخرى',
+      source: query.source || 'تحرير وتحقيق ذاتي',
+      date: new Date().toISOString().split('T')[0],
+    });
+    
+    setConvertingQueryId(query.id);
+    setActiveTab('add');
+    showToast('تم نقل تفاصيل الاستشكال والتحرير بنجاح إلى تدوين الفائدة! يمكنك مراجعتها وتصنيفها الآن ثم حفظها 📚✨', 'info');
   };
 
   // 6. Settings Operations
@@ -691,9 +718,23 @@ export default function App() {
 
   // 8. Filters for Home feed
   const filteredBenefits = benefits.filter(b => {
-    const matchesSearch = b.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          b.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (b.source && b.source.toLowerCase().includes(searchQuery.toLowerCase()));
+    let matchesSearch = true;
+    if (searchQuery.trim()) {
+      const regex = getArabicSearchRegex(searchQuery);
+      if (regex) {
+        const dateFormatted = formatToHijriAndGregorian(b.date);
+        const combinedText = [
+          b.title,
+          b.content,
+          b.category,
+          b.source || '',
+          b.date,
+          dateFormatted
+        ].join(' ');
+        
+        matchesSearch = regex.test(combinedText);
+      }
+    }
     
     const matchesCategory = selectedCategory === 'الكل' || b.category === selectedCategory;
     const matchesFavorite = !onlyFavorites || b.isFavorite;
@@ -758,6 +799,50 @@ export default function App() {
                 onUpdateSettings={handleUpdateSettings}
                 onUnlockControlPanel={handleToggleControlPanel}
               />
+
+              {/* Startup Non-Intrusive Doubt Banner */}
+              {!isDoubtBannerDismissed && queries.filter(q => !q.isResolved).length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0, y: -10 }}
+                  animate={{ opacity: 1, height: 'auto', y: 0 }}
+                  exit={{ opacity: 0, height: 0, y: -10 }}
+                  className="bg-amber-50/70 border border-amber-200/60 rounded-2xl p-4 flex items-start justify-between gap-4 shadow-sm relative overflow-hidden"
+                >
+                  <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-amber-500 rounded-r-2xl" />
+                  
+                  <div className="flex gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center border border-amber-200 text-amber-600 shrink-0 mt-0.5">
+                      <HelpCircle className="w-5 h-5 animate-pulse" />
+                    </div>
+                    <div className="text-right space-y-1">
+                      <h4 className="text-sm font-bold text-amber-900 font-sans">
+                        تنبيه علمي للمراجعة والتحقيق
+                      </h4>
+                      <p className="text-xs text-amber-800 leading-relaxed max-w-xl">
+                        لديك {queries.filter(q => !q.isResolved).length} من المسائل والاستشكالات العلمية العالقة التي لا تزال تحت البحث والتحقيق. يرجى مراجعتها وتوثيق مخارجها متى ما تيسر لك ذلك.
+                      </p>
+                      
+                      <button
+                        onClick={() => {
+                          setActiveTab('queries');
+                          setIsDoubtBannerDismissed(true);
+                        }}
+                        className="mt-2 text-xs font-bold text-amber-950 hover:text-amber-800 underline flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <span>انتقل إلى منصة الاستشكالات والبحث عن حلول ↗</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setIsDoubtBannerDismissed(true)}
+                    className="p-1 text-amber-600 hover:text-amber-800 hover:bg-amber-100/50 rounded-lg transition-all cursor-pointer"
+                    title="تجاهل التنبيه"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </motion.div>
+              )}
 
               {/* Filtering Controls Panel */}
               <div className="bg-white rounded-2xl border border-zinc-200 p-5 custom-shadow space-y-4">
@@ -842,15 +927,58 @@ export default function App() {
               </div>
 
               {/* Search Bar placed DIRECTLY above the benefits list */}
-              <div className="relative w-full">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="🔍 ابحث في عناوين الفوائد ومضامينها ومصادرها..."
-                  className="w-full pl-4 pr-11 py-3 bg-white text-zinc-800 rounded-2xl border-2 border-brand-emerald/20 hover:border-brand-emerald/40 text-sm focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-sans shadow-md"
-                />
-                <Search className="w-5 h-5 text-brand-emerald absolute right-4 top-3.5" />
+              <div className="relative w-full space-y-2">
+                <div className="relative w-full">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="🔍 ابحث في عناوين الفوائد ومضامينها ومصادرها وتواريخها..."
+                    className={`w-full pr-11 py-3 bg-white text-zinc-800 rounded-2xl border-2 border-brand-emerald/20 hover:border-brand-emerald/40 text-sm focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-sans shadow-md ${
+                      searchQuery ? 'pl-11' : 'pl-4'
+                    }`}
+                  />
+                  <Search className="w-5 h-5 text-brand-emerald absolute right-4 top-3.5" />
+                  
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute left-4 top-3 p-1 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-150 rounded-full transition-all cursor-pointer active:scale-90"
+                      title="مسح البحث"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {searchQuery && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center justify-between px-3 py-1 bg-brand-emerald/5 border border-brand-emerald/10 rounded-xl text-xs text-brand-emerald-dark font-sans"
+                  >
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <span>تم العثور على</span>
+                      <span className="bg-brand-emerald text-white px-2 py-0.5 rounded-full text-[11px]">
+                        {filteredBenefits.length}
+                      </span>
+                      <span>
+                        {filteredBenefits.length === 1 
+                          ? 'فائدة' 
+                          : (filteredBenefits.length >= 3 && filteredBenefits.length <= 10) 
+                            ? 'فوائد' 
+                            : 'فائدة'} مطابقة للبحث
+                      </span>
+                    </div>
+                    
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="text-red-650 hover:text-red-800 font-bold transition-colors cursor-pointer"
+                    >
+                      إلغاء البحث ✕
+                    </button>
+                  </motion.div>
+                )}
               </div>
 
               {/* Benefits Cards Feed List */}
@@ -872,12 +1000,15 @@ export default function App() {
                       onToggleFavorite={handleToggleFavorite}
                       onEdit={(b) => {
                         setEditingBenefit(b);
+                        setPrefilledBenefit(null);
+                        setConvertingQueryId(null);
                         setActiveTab('add');
                       }}
                       onDelete={handleDeleteBenefit}
                       showToast={showToast}
                       onOpenShareCard={(b) => setSharingBenefit(b)}
                       forceExpanded={expandedBenefitId === benefit.id}
+                      searchQuery={searchQuery}
                     />
                   ))
                 )}
@@ -896,8 +1027,11 @@ export default function App() {
               <BenefitForm
                 onSave={handleSaveBenefit}
                 initialBenefit={editingBenefit}
+                prefilledData={prefilledBenefit}
                 onCancel={() => {
                   setEditingBenefit(null);
+                  setPrefilledBenefit(null);
+                  setConvertingQueryId(null);
                   setActiveTab('home');
                 }}
                 showToast={showToast}
@@ -918,6 +1052,7 @@ export default function App() {
                 onAddQuery={handleAddQuery}
                 onUpdateQuery={handleUpdateQuery}
                 onDeleteQuery={handleDeleteQuery}
+                onConvertToBenefit={handleConvertToBenefit}
                 showToast={showToast}
               />
             </motion.div>

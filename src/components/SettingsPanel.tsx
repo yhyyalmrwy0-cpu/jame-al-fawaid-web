@@ -115,7 +115,23 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [pdfStyle, setPdfStyle] = useState<'grid' | 'book'>('grid');
   const [pdfTheme, setPdfTheme] = useState<string>('emerald');
   const [pdfBookTitle, setPdfBookTitle] = useState('خِزانة الفوائد والفرائد العلمية');
-  const [pdfAuthorName, setPdfAuthorName] = useState(settings.programmerName || 'طالب العلم الباحث');
+  const [pdfAuthorName, setPdfAuthorName] = useState<string>(() => {
+    try {
+      return localStorage.getItem('abuosid_pdf_author_name') || settings.programmerName || 'طالب العلم الباحث';
+    } catch (e) {
+      return settings.programmerName || 'طالب العلم الباحث';
+    }
+  });
+
+  // Save pdfAuthorName to localStorage whenever it changes to keep it persistent and independent
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('abuosid_pdf_author_name', pdfAuthorName);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [pdfAuthorName]);
+
   const [includeCover, setIncludeCover] = useState(true);
   const [pdfCategorySelect, setPdfCategorySelect] = useState<string>('all');
 
@@ -151,12 +167,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     handleCloudBackupRef.current = handleCloudBackup;
   }, [benefits, queries, userEmail, isActivated, settings.programmerName]);
 
-  // Keep pdfAuthorName synced with settings.programmerName
-  React.useEffect(() => {
-    if (settings.programmerName) {
-      setPdfAuthorName(settings.programmerName);
-    }
-  }, [settings.programmerName]);
+
   const [showDemoKeys, setShowDemoKeys] = useState(false);
   const [demoKeys] = useState<string[]>([
     "ABU-OSID-PREMIUM-1111",
@@ -834,7 +845,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <div>
               <p className="text-sm font-bold text-zinc-800">تكرار إرسال التنبيهات الدورية التلقائية</p>
               <p className="text-xs text-zinc-500 mt-0.5">
-                سيقوم جامع الفوائد تلقائياً بإرسال فوائد عشوائية مذكرّة إلى شاشة هاتفك مباشرة حسب الفاصل الزمني المختار.
+                سيقوم جامع الفوائد تلقائياً بإرسال فوائد مذكرّة من مقيداتك إلى شاشة هاتفك مباشرة حسب الفاصل الزمني المختار.
               </p>
             </div>
             
@@ -924,10 +935,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         body: `${randomBenefit.title}\n${randomBenefit.content.substring(0, 80)}...`,
                       });
                     } catch (e) {
-                      showToast(`💡 فائدة عشوائية: ${randomBenefit.title}`, 'success');
+                      showToast(`💡 فائدة اليوم: ${randomBenefit.title}`, 'success');
                     }
                   } else {
-                    showToast(`💡 فائدة عشوائية: ${randomBenefit.title}`, 'success');
+                    showToast(`💡 فائدة اليوم: ${randomBenefit.title}`, 'success');
                   }
                 } else {
                   showToast('لا توجد فوائد مقيدة لمحاكاتها!', 'warning');
@@ -1150,14 +1161,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     type="text"
                     value={pdfAuthorName}
                     onChange={(e) => setPdfAuthorName(e.target.value)}
-                    onBlur={() => {
-                      if (pdfAuthorName.trim() && pdfAuthorName !== settings.programmerName) {
-                        onUpdateSettings({
-                          ...settings,
-                          programmerName: pdfAuthorName.trim(),
-                        });
-                      }
-                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         (e.target as HTMLInputElement).blur();
