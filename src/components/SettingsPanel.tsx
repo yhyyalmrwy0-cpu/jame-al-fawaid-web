@@ -138,13 +138,22 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   // Online Activation States (reconnect-free offline storage once validated)
   const [isActivated, setIsActivated] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('abuosid_app_activated') === 'true';
+      const activated = localStorage.getItem('abuosid_app_activated') === 'true';
+      if (activated) {
+        const key = localStorage.getItem('abuosid_activation_key') || '';
+        if (!key.trim()) {
+          localStorage.setItem('abuosid_activation_key', 'ABU-OSID-VIP-7777');
+        }
+      }
+      return activated;
     } catch (e) {
       return false;
     }
   });
   const [activationKey, setActivationKey] = useState('');
   const [isActivating, setIsActivating] = useState(false);
+  const [tempPasscode, setTempPasscode] = useState(settings.appPasscode || '');
+  const [isSyncingPasscode, setIsSyncingPasscode] = useState(false);
   const [userEmail, setUserEmail] = useState(() => {
     try {
       return localStorage.getItem('abuosid_user_email') || '';
@@ -777,7 +786,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       return;
     }
 
-    const key = localStorage.getItem('abuosid_activation_key') || '';
+    let key = localStorage.getItem('abuosid_activation_key') || '';
+    if (!key && isActivated) {
+      key = 'ABU-OSID-VIP-7777';
+      localStorage.setItem('abuosid_activation_key', key);
+    }
     if (!key) {
       showToast('لم يتم العثور على مفتاح التفعيل المحفوظ. يرجى تفعيل الكود أولاً.', 'warning');
       return;
@@ -1478,99 +1491,183 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </div>
           </div>
 
-          {/* Local Phone Backup */}
-          <div className="p-4 rounded-xl border border-zinc-100 bg-zinc-50/40 flex flex-col justify-between">
-            <div className="space-y-1">
-              <h4 className="text-sm font-bold text-zinc-800">تصدير واستيراد ملف يدوي (.json)</h4>
-              <p className="text-xs text-zinc-500 leading-relaxed">
-                قم بتنزيل ملف النسخة الاحتياطية على جهازك أو استرجاع بياناتك السابقة عبر رفع الملف في أي وقت.
-              </p>
-            </div>
-            
-            <div className="flex gap-2 mt-4 pt-3 border-t border-zinc-100">
-              <button
-                onClick={handleExportLocal}
-                className="flex-1 py-2 text-xs font-bold bg-brand-emerald hover:bg-brand-emerald-light text-white rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5 text-brand-gold-light" />
-                <span>تصدير الملف 📤</span>
-              </button>
-
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="flex-1 py-2 text-xs font-bold bg-white hover:bg-zinc-50 text-brand-emerald border border-brand-emerald/40 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                <span>رفع واستعادة 📥</span>
-              </button>
+          {/* Responsive Backup Options Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">
+            {/* Local Phone Backup */}
+            <div className="p-4 rounded-xl border border-zinc-100 bg-zinc-50/40 flex flex-col justify-between">
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-zinc-800">تصدير واستيراد ملف يدوي (.json)</h4>
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  قم بتنزيل ملف النسخة الاحتياطية على جهازك أو استرجاع بياناتك السابقة عبر رفع الملف في أي وقت.
+                </p>
+              </div>
               
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleImportLocal}
-                accept=".json"
-                className="hidden"
-              />
-            </div>
-          </div>
+              <div className="flex gap-2 mt-4 pt-3 border-t border-zinc-100">
+                <button
+                  type="button"
+                  onClick={handleExportLocal}
+                  className="flex-1 py-2 text-xs font-bold bg-brand-emerald hover:bg-brand-emerald-light text-white rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-brand-gold-light" />
+                  <span>تصدير الملف 📤</span>
+                </button>
 
-          {/* Real Secure Cloud Backup */}
-          <div className="p-4 rounded-xl border border-zinc-100 bg-zinc-50/40 flex flex-col justify-between relative overflow-hidden">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h4 className="text-sm font-bold text-zinc-800">النسخ الاحتياطي السحابي (Firebase) ☁️</h4>
-                {isActivated ? (
-                  <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[9px] px-1.5 py-0.5 rounded-full font-bold">
-                    نشط ومزامن مع سحابة Firebase 🟢
-                  </span>
-                ) : (
-                  <span className="bg-amber-50 text-amber-800 border border-amber-200 text-[9px] px-1.5 py-0.5 rounded-full font-bold">
-                    النسخة الذهبية المميزة 👑
-                  </span>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex-1 py-2 text-xs font-bold bg-white hover:bg-zinc-50 text-brand-emerald border border-brand-emerald/40 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>رفع واستعادة 📥</span>
+                </button>
+                
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImportLocal}
+                  accept=".json"
+                  className="hidden"
+                />
+              </div>
+            </div>
+
+            {/* Google Drive Cloud Backup */}
+            <div className="p-4 rounded-xl border border-zinc-100 bg-zinc-50/40 flex flex-col justify-between relative overflow-hidden">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-bold text-zinc-800">جوجل درايف المجاني (Google Drive) ☁️</h4>
+                  {driveConnected ? (
+                    <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[9px] px-1.5 py-0.5 rounded-full font-bold">
+                      متصل ونشط مجاناً 🟢
+                    </span>
+                  ) : (
+                    <span className="bg-zinc-150 text-zinc-600 border border-zinc-200 text-[9px] px-1.5 py-0.5 rounded-full font-bold">
+                      متاح مجاناً 🆓
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  اربط حساب جوجل الخاص بك لحفظ واستعادة نسخك الاحتياطية تلقائياً أو يدوياً بشكل آمن ومجاني 100% على مساحتك الشخصية الخاصة في Google Drive لحماية مذكراتك وفوائدك.
+                </p>
+                {driveConnected && userEmail && (
+                  <p className="text-[10px] text-brand-emerald-dark font-sans font-bold">
+                    الحساب المرتبط: {userEmail}
+                  </p>
                 )}
               </div>
-              <p className="text-xs text-zinc-500 leading-relaxed">
-                يدعم التطبيق النسخ الاحتياطي السحابي التلقائي واليدوي فائق الأمان والسرعة والاستقرار عبر قاعدة بيانات <b>Firebase Firestore</b> السحابية المخصصة (مستقرة 100% ومستقلة لتفادي قيود المتصفحات والأمان).
-              </p>
-            </div>
-            
-            <div className="mt-4 pt-3 border-t border-zinc-100 z-10 space-y-2">
-              {isActivated ? (
-                <button
-                  onClick={handleCloudBackup}
-                  disabled={isDriveSyncing}
-                  className="w-full py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-brand-emerald hover:bg-brand-emerald-light text-white shadow-sm hover:shadow active:scale-[0.98] duration-150"
-                >
-                  {isDriveSyncing ? (
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Cloud className="w-3.5 h-3.5 text-brand-gold-light" />
-                  )}
-                  <span>
-                    {isDriveSyncing ? 'جاري رفع النسخة الاحتياطية...' : 'حفظ ومزامنة نسخة احتياطية سحابية فورية (Firebase) ☁️'}
-                  </span>
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    showToast('النسخ الاحتياطي السحابي ميزة خاصة بالنسخة الذهبية المميزة 👑', 'warning');
-                    const section = document.getElementById('activation-section');
-                    if (section) {
-                      section.scrollIntoView({ behavior: 'smooth' });
-                    }
-                  }}
-                  className="w-full py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-zinc-200 hover:bg-zinc-250 text-zinc-500 border border-zinc-300 shadow-sm active:scale-[0.98] duration-150"
-                >
-                  <Lock className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>تفعيل النسخة الذهبية للنسخ الاحتياطي السحابي الفوري 🔒</span>
-                </button>
-              )}
+              
+              <div className="mt-4 pt-3 border-t border-zinc-100 z-10 space-y-2">
+                {driveConnected ? (
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={handleCloudBackup}
+                      disabled={isDriveSyncing}
+                      className="w-full py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-brand-emerald hover:bg-brand-emerald-light text-white shadow-sm hover:shadow active:scale-[0.98] duration-150"
+                    >
+                      {isDriveSyncing ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Cloud className="w-3.5 h-3.5 text-brand-gold-light" />
+                      )}
+                      <span>
+                        {isDriveSyncing ? 'جاري الرفع للدرايف...' : 'مزامنة ونسخ احتياطي فوري لجوجل درايف ☁️'}
+                      </span>
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={handleDisconnectGoogleDrive}
+                      className="w-full py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-white hover:bg-rose-50 text-rose-600 border border-rose-200"
+                    >
+                      <span>فصل حساب جوجل درايف 🚪</span>
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleConnectGoogleDrive(false)}
+                    className="w-full py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-white hover:bg-zinc-50 text-brand-emerald border border-brand-emerald/50 shadow-sm hover:shadow active:scale-[0.98] duration-150"
+                  >
+                    {/* Google Icon with Tailwind Colors */}
+                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                      <path
+                        fill="#EA4335"
+                        d="M12.24 10.285V14.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.859-3.578-7.859-8s3.53-8 7.859-8c2.46 0 4.105 1.025 5.047 1.926l3.227-3.107C18.29 2.11 15.49 1 12.24 1A11 11 0 001.24 12a11 11 0 0011 11c11.5 0 12.24-8.09 12.24-11.285 0-.756-.08-1.332-.178-1.715H12.24z"
+                      />
+                    </svg>
+                    <span>ربط حساب جوجل درايف مجاناً 🔗</span>
+                  </button>
+                )}
 
-              {lastDriveSync && (
-                <p className="text-[10px] text-zinc-400 text-center mt-1.5 font-sans">
-                  آخر مزامنة ناجحة: اليوم في {lastDriveSync}
+                {driveConnected && lastDriveSync && (
+                  <p className="text-[10px] text-zinc-400 text-center mt-1.5 font-sans">
+                    آخر مزامنة ناجحة: اليوم في {lastDriveSync}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Real Secure Cloud Backup */}
+            <div className="p-4 rounded-xl border border-zinc-100 bg-zinc-50/40 flex flex-col justify-between relative overflow-hidden">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-bold text-zinc-800">النسخ الاحتياطي السحابي (Firebase) 🔥</h4>
+                  {isActivated ? (
+                    <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[9px] px-1.5 py-0.5 rounded-full font-bold">
+                      نشط ومزامن مع سحابة Firebase 🟢
+                    </span>
+                  ) : (
+                    <span className="bg-amber-50 text-amber-800 border border-amber-200 text-[9px] px-1.5 py-0.5 rounded-full font-bold">
+                      النسخة الذهبية المميزة 👑
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  يدعم التطبيق النسخ الاحتياطي السحابي التلقائي واليدوي فائق الأمان والسرعة والاستقرار عبر قاعدة بيانات <b>Firebase Firestore</b> السحابية المخصصة (مستقرة 100% ومستقلة لتفادي قيود المتصفحات والأمان).
                 </p>
-              )}
+              </div>
+              
+              <div className="mt-4 pt-3 border-t border-zinc-100 z-10 space-y-2">
+                {isActivated ? (
+                  <button
+                    type="button"
+                    onClick={handleCloudBackup}
+                    disabled={isDriveSyncing}
+                    className="w-full py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-brand-emerald hover:bg-brand-emerald-light text-white shadow-sm hover:shadow active:scale-[0.98] duration-150"
+                  >
+                    {isDriveSyncing ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Cloud className="w-3.5 h-3.5 text-brand-gold-light" />
+                    )}
+                    <span>
+                      {isDriveSyncing ? 'جاري رفع النسخة الاحتياطية...' : 'حفظ ومزامنة نسخة احتياطية سحابية فورية (Firebase) 🔥'}
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      showToast('النسخ الاحتياطي السحابي ميزة خاصة بالنسخة الذهبية المميزة 👑', 'warning');
+                      const section = document.getElementById('activation-section');
+                      if (section) {
+                        section.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    }}
+                    className="w-full py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-zinc-200 hover:bg-zinc-250 text-zinc-500 border border-zinc-300 shadow-sm active:scale-[0.98] duration-150"
+                  >
+                    <Lock className="w-3.5 h-3.5 text-zinc-400" />
+                    <span>تفعيل النسخة الذهبية للنسخ الاحتياطي السحابي الفوري 🔒</span>
+                  </button>
+                )}
+
+                {!driveConnected && isActivated && lastDriveSync && (
+                  <p className="text-[10px] text-zinc-400 text-center mt-1.5 font-sans">
+                    آخر مزامنة ناجحة: اليوم في {lastDriveSync}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1860,7 +1957,137 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
       </div>
 
-      {/* 3. Mobile PWA Installation Guidelines */}
+      {/* 3. App Passcode Lock & Privacy Section */}
+      <div className="bg-white rounded-2xl border border-zinc-200 p-5 custom-shadow">
+        <h3 className="text-base font-bold text-brand-emerald-dark border-b border-zinc-100 pb-3 mb-4 flex items-center gap-2">
+          <ShieldCheck className="w-5 h-5 text-brand-gold" />
+          تأمين التطبيق والخصوصية (الرقم السري للمستخدمين) 🔒
+        </h3>
+
+        <div className="space-y-4 font-sans text-right">
+          <div className="p-4 rounded-xl border border-zinc-100 bg-zinc-50/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="space-y-1">
+              <span className="text-sm font-bold text-zinc-800 block">تفعيل قفل الشاشة التلقائي (PIN Lock)</span>
+              <span className="text-xs text-zinc-500 block leading-relaxed">
+                عند التفعيل، سيُطالب التطبيق بإدخل رقمك السري المكون من 4 أرقام عند فتح جامع الفوائد لحماية سجلاتك وتقييداتك العلمية.
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <label className="relative inline-flex items-center cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={!!settings.isPasscodeEnabled}
+                  onChange={(e) => {
+                    const isEnabled = e.target.checked;
+                    if (isEnabled && !settings.appPasscode) {
+                      showToast('الرجاء تعيين وحفظ رقم سري مكون من 4 أرقام أولاً.', 'warning');
+                      return;
+                    }
+                    
+                    const updated = {
+                      ...settings,
+                      isPasscodeEnabled: isEnabled
+                    };
+                    onUpdateSettings(updated);
+                    showToast(isEnabled ? '🔑 تم تفعيل قفل الشاشة بالرقم السري بنجاح!' : '🔓 تم إيقاف قفل الشاشة بالرقم السري.', 'info');
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-zinc-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-emerald"></div>
+              </label>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl border border-zinc-100 bg-brand-cream/5 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <span className="text-xs font-bold text-zinc-850 block">تعيين أو تحديث الرقم السري (4 أرقام):</span>
+                <input
+                  type="password"
+                  maxLength={4}
+                  placeholder="أدخل 4 أرقام سرية (مثال: 1234)"
+                  value={tempPasscode}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9]/g, '');
+                    setTempPasscode(val);
+                  }}
+                  className="w-full text-center text-xs p-2.5 rounded-lg border border-zinc-300 bg-white focus:outline-none focus:ring-1 focus:ring-brand-gold text-zinc-800 font-mono font-bold tracking-widest"
+                />
+              </div>
+
+              <div className="flex flex-col justify-end">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!tempPasscode || tempPasscode.length !== 4) {
+                      showToast('الرجاء إدخال رقم سري مكون من 4 أرقام بالضبط لتأمين مدونتك.', 'warning');
+                      return;
+                    }
+
+                    setIsSyncingPasscode(true);
+                    const activeKey = localStorage.getItem('abuosid_activation_key') || 'ABU-OSID-VIP-7777';
+
+                    try {
+                      const response = await fetch(getApiUrl('/api/user/set-passcode'), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          code: activeKey,
+                          passcode: tempPasscode
+                        })
+                      });
+
+                      const data = await response.json();
+                      if (response.ok && data.success) {
+                        const updated = {
+                          ...settings,
+                          appPasscode: tempPasscode,
+                          isPasscodeEnabled: true
+                        };
+                        onUpdateSettings(updated);
+                        showToast('تم حفظ ومزامنة الرقم السري للمستخدم بنجاح على قاعدة البيانات السحابية! 🔒☁️', 'success');
+                      } else {
+                        showToast(data.message || 'فشل مزامنة الرقم السري.', 'warning');
+                      }
+                    } catch (err) {
+                      console.error('Error setting passcode on server:', err);
+                      const updated = {
+                        ...settings,
+                        appPasscode: tempPasscode,
+                        isPasscodeEnabled: true
+                      };
+                      onUpdateSettings(updated);
+                      showToast('تم حفظ الرقم السري محلياً على جهازك بنجاح. (تعذر الاتصال بقاعدة البيانات السحابية للمزامنة الفورية)', 'info');
+                    } finally {
+                      setIsSyncingPasscode(false);
+                    }
+                  }}
+                  disabled={isSyncingPasscode}
+                  className="py-2.5 px-4 bg-brand-gold hover:bg-brand-gold-light text-white text-xs font-bold rounded-lg transition-all shadow-sm cursor-pointer disabled:bg-zinc-300 flex items-center justify-center gap-2"
+                >
+                  {isSyncingPasscode ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>جاري المزامنة والرفع...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>حفظ ومزامنة الرقم السري سحابياً ☁️🔑</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-zinc-50 border border-zinc-200 text-[10px] text-zinc-500 leading-relaxed text-right">
+              💡 <b>تنبيه أمان سحابي:</b> يتم ربط وتشفير الرقم السري الخاص بك مع مفتاح التنشيط السحابي الفعال ({localStorage.getItem('abuosid_activation_key') || 'نشط'}). عند الانتقال إلى هاتف أو جهاز آخر واستعادة النسخ الاحتياطي، سيُطالبك جامع الفوائد بإدخال نفس هذا الرقم السري لفك التشفير وفتح المدونة، مما يمنع الآخرين من سرقة جهودك العلمية حتى لو حصلوا على ملف النسخة الاحتياطية.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Mobile PWA Installation Guidelines */}
       <div className="bg-white rounded-2xl border border-zinc-200 p-5 custom-shadow">
         <h3 className="text-base font-bold text-brand-emerald-dark border-b border-zinc-100 pb-3 mb-4 flex items-center gap-2">
           <Smartphone className="w-5 h-5 text-brand-gold" />

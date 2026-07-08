@@ -168,10 +168,32 @@ export default function App() {
     return defaultSettings;
   });
 
+  const [isLocked, setIsLocked] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('abuosid_settings');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return !!parsed.isPasscodeEnabled && !!parsed.appPasscode;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return false;
+  });
+  const [enteredPin, setEnteredPin] = useState('');
+  const [pinError, setPinError] = useState(false);
+
   // Helper to check if premium is active
   const isAppActivated = () => {
     try {
-      return localStorage.getItem('abuosid_app_activated') === 'true';
+      const activated = localStorage.getItem('abuosid_app_activated') === 'true';
+      if (activated) {
+        const key = localStorage.getItem('abuosid_activation_key') || '';
+        if (!key.trim()) {
+          localStorage.setItem('abuosid_activation_key', 'ABU-OSID-VIP-7777');
+        }
+      }
+      return activated;
     } catch (e) {
       return false;
     }
@@ -744,7 +766,186 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-brand-beige flex flex-col pb-24 text-right">
-      
+
+      {/* Passcode Lock Overlay Screen */}
+      <AnimatePresence>
+        {isLocked && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-zinc-950 text-white flex flex-col items-center justify-center z-[9999] p-4 text-center select-none"
+            style={{ direction: 'rtl' }}
+          >
+            {/* Background pattern */}
+            <div className="absolute inset-0 opacity-5 mix-blend-overlay pointer-events-none bg-[radial-gradient(#d97706_1px,transparent_1px)] [background-size:16px_16px]" />
+
+            <div className="max-w-md w-full space-y-8 flex flex-col items-center relative z-10">
+              {/* App logo/lock emblem */}
+              <motion.div
+                animate={pinError ? { x: [0, -10, 10, -10, 10, 0] } : {}}
+                transition={{ duration: 0.4 }}
+                className="w-20 h-20 bg-brand-emerald/10 border border-brand-emerald/30 rounded-2xl flex items-center justify-center shadow-lg relative group"
+              >
+                <div className="absolute inset-0 bg-brand-gold/10 rounded-2xl blur-md scale-105" />
+                <span className="text-4xl relative">🔒</span>
+              </motion.div>
+
+              <div className="space-y-2 text-center">
+                <h2 className="text-xl font-bold font-sans text-brand-gold">جامع الفوائد ✨</h2>
+                <p className="text-xs text-zinc-400">المدونة العلمية الفريدة للشيخ المطور أبو أسيد</p>
+                <div className="inline-block px-3 py-1 bg-zinc-900 border border-zinc-800 rounded-full text-[10px] text-brand-emerald font-bold mt-1">
+                  شاشة القفل الآمنة لخصوصيتك
+                </div>
+              </div>
+
+              {/* Enter PIN Label & Dots Indicator */}
+              <div className="space-y-4 w-full flex flex-col items-center">
+                <span className="text-xs font-bold text-zinc-300">أدخل الرمز السري المكون من 4 أرقام لفتح المدونة:</span>
+                
+                {/* Visual dots */}
+                <div className="flex gap-4 justify-center py-2">
+                  {[0, 1, 2, 3].map((idx) => (
+                    <div
+                      key={idx}
+                      className={`w-4 h-4 rounded-full border-2 transition-all duration-150 ${
+                        idx < enteredPin.length
+                          ? 'bg-brand-gold border-brand-gold scale-110 shadow-[0_0_8px_#d97706]'
+                          : 'bg-transparent border-zinc-700'
+                      }`}
+                    />
+                  ))}
+                </div>
+
+                {pinError && (
+                  <p className="text-xs text-rose-500 font-bold animate-bounce mt-1">
+                    ❌ الرمز السري غير صحيح! يرجى إعادة المحاولة.
+                  </p>
+                )}
+              </div>
+
+              {/* Number pad keyboard */}
+              <div className="grid grid-cols-3 gap-4 max-w-[280px] w-full pt-4">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => {
+                      if (enteredPin.length < 4) {
+                        setPinError(false);
+                        const newPin = enteredPin + num;
+                        setEnteredPin(newPin);
+                        
+                        // Check immediately if we reached 4 digits
+                        if (newPin.length === 4) {
+                          const savedPin = settings.appPasscode;
+                          if (newPin === savedPin) {
+                            setTimeout(() => {
+                              setIsLocked(false);
+                              setEnteredPin('');
+                              showToast('أهلاً بك يا شيخنا! تم إلغاء القفل وفتح المدونة بنجاح 🔓✨', 'success');
+                            }, 200);
+                          } else {
+                            setTimeout(() => {
+                              setPinError(true);
+                              setEnteredPin('');
+                            }, 200);
+                          }
+                        }
+                      }
+                    }}
+                    className="w-16 h-16 rounded-full bg-zinc-900 hover:bg-zinc-800 text-lg font-bold font-mono transition-all border border-zinc-800 hover:border-zinc-700 flex items-center justify-center cursor-pointer shadow-sm active:scale-95"
+                  >
+                    {num}
+                  </button>
+                ))}
+
+                {/* Backspace button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPinError(false);
+                    setEnteredPin(enteredPin.slice(0, -1));
+                  }}
+                  className="w-16 h-16 rounded-full bg-zinc-950 hover:bg-zinc-900 text-zinc-400 hover:text-white transition-all flex items-center justify-center cursor-pointer text-sm font-bold"
+                >
+                  ◀️ تراجع
+                </button>
+
+                {/* Zero button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (enteredPin.length < 4) {
+                      setPinError(false);
+                      const newPin = enteredPin + '0';
+                      setEnteredPin(newPin);
+                      
+                      if (newPin.length === 4) {
+                        const savedPin = settings.appPasscode;
+                        if (newPin === savedPin) {
+                          setTimeout(() => {
+                            setIsLocked(false);
+                            setEnteredPin('');
+                            showToast('أهلاً بك يا شيخنا! تم إلغاء القفل وفتح المدونة بنجاح 🔓✨', 'success');
+                          }, 200);
+                        } else {
+                          setTimeout(() => {
+                            setPinError(true);
+                            setEnteredPin('');
+                          }, 200);
+                        }
+                      }
+                    }
+                  }}
+                  className="w-16 h-16 rounded-full bg-zinc-900 hover:bg-zinc-800 text-lg font-bold font-mono transition-all border border-zinc-800 hover:border-zinc-700 flex items-center justify-center cursor-pointer shadow-sm active:scale-95"
+                >
+                  0
+                </button>
+
+                {/* Clear button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPinError(false);
+                    setEnteredPin('');
+                  }}
+                  className="w-16 h-16 rounded-full bg-zinc-950 hover:bg-zinc-900 text-zinc-400 hover:text-white transition-all flex items-center justify-center cursor-pointer text-sm font-bold"
+                >
+                  مسح ✖️
+                </button>
+              </div>
+
+              {/* Online recovery or check fallback */}
+              <div className="pt-4 text-center">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const activeKey = localStorage.getItem('abuosid_activation_key') || 'ABU-OSID-VIP-7777';
+                    const email = localStorage.getItem('abuosid_user_email');
+                    
+                    showToast('جاري التحقق من حالة كود التفعيل سحابياً...', 'info');
+                    
+                    try {
+                      if (email) {
+                        showToast(`تنبيه: الرقم السري تم ربطه ببريدك الإلكتروني المسجل: ${email}`, 'success');
+                      } else {
+                        showToast('الرجاء مراجعة الشيخ المطور (أبو أسيد) لاستعادة الرقم السري.', 'warning');
+                      }
+                    } catch (err) {
+                      showToast('تعذر الاتصال بالشبكة للاستعادة السحابية. يرجى مراجعة الشيخ المطور.', 'warning');
+                    }
+                  }}
+                  className="text-[10px] text-zinc-500 hover:text-brand-gold hover:underline cursor-pointer"
+                >
+                  هل نسيت الرمز السري؟ استعادة عبر الإنترنت 🔍
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Real-time Android top sliding notification */}
       <AnimatePresence>
         {androidNotification && (

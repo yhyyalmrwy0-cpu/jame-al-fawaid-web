@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Backups collection
+    match /backups/{backupId} {
+      allow read, write: if isValidId(backupId);
+    }
+
+    // Cloud Backups collection
+    match /cloud_backups/{backupId} {
+      allow read, write: if isValidId(backupId);
+    }
+
+    // Activation Keys collection
+    match /activation_keys/{key} {
+      allow read, write: if key is string && key.size() <= 128;
+    }
+
+    // Application State collection (admin credentials and stats)
+    match /app_state/{documentId} {
+      allow read, write: if isValidId(documentId);
+    }
+  }
+}

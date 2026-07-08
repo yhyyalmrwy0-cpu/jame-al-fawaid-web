@@ -425,14 +425,40 @@ export const ShareCardModal: React.FC<ShareCardModalProps> = ({
       ctx.lineTo(w / 2 + 150, 165);
       ctx.stroke();
 
-      // 5. Benefit Title: "【 العنوان 】"
+      // 5. Benefit Title: "【 العنوان 】" (with multi-line wrapping if too long)
       ctx.fillStyle = activeTheme.accentColor;
       ctx.font = `bold 44px ${activeFont.cssValue}`;
-      const titleText = `【 ${benefit.title} 】`;
-      ctx.fillText(titleText, w / 2, 230);
+      const titleRawText = `【 ${benefit.title.trim()} 】`;
+      const titleMaxWidth = w - 240; // Same as content width margin for consistent bounds
+
+      const wordsTitle = titleRawText.split(' ');
+      let lineTitle = '';
+      const titleLines: string[] = [];
+
+      for (let n = 0; n < wordsTitle.length; n++) {
+        const testLine = lineTitle + wordsTitle[n] + ' ';
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > titleMaxWidth && n > 0) {
+          titleLines.push(lineTitle.trim());
+          lineTitle = wordsTitle[n] + ' ';
+        } else {
+          lineTitle = testLine;
+        }
+      }
+      titleLines.push(lineTitle.trim());
+
+      const titleLineHeight = 55;
+      // Center the title block vertically around Y = 230
+      const titleTotalHeight = titleLines.length * titleLineHeight;
+      const titleStartY = 230 - (titleTotalHeight / 2) + (titleLineHeight / 2);
+
+      for (let i = 0; i < titleLines.length; i++) {
+        ctx.fillText(titleLines[i], w / 2, titleStartY + (i * titleLineHeight));
+      }
 
       // 6. Draw Content with Multi-line Wrapping & Font Auto-scaling
-      const contentAreaYStart = 300;
+      const titleBottomY = Math.max(260, titleStartY + ((titleLines.length - 1) * titleLineHeight) + 35);
+      const contentAreaYStart = titleBottomY + 20;
       const contentAreaYEnd = h - 230;
       const contentAreaHeight = contentAreaYEnd - contentAreaYStart;
       const contentWidth = w - 240; // Generous margins on left/right
@@ -551,7 +577,7 @@ export const ShareCardModal: React.FC<ShareCardModalProps> = ({
         } else if (action === 'share') {
           // 1 & 2. Convert design to Blob (already done via canvas.toBlob) and convert to File Object 'faida.png'
           const file = new File([blob], 'faida.png', { type: 'image/png' });
-          const shareText = `📌 *${benefit.title}*\n\n${benefit.content}\n\n✍️ من فوائد: ${authorName}\n${benefit.source ? `📚 المصدر: ${benefit.source}` : ''}\n\nتم النشر بواسطة تطبيق جامع الفوائد 📚\nقيد فوائدك عبر هذا الرابط\nhttps://jame-al-fawaid-kc2u.vercel.app`;
+          const shareText = `تم النشر بواسطة تطبيق جامع الفوائد 📚\nقيد فوائدك عبر هذا الرابط:\nhttps://jame-al-fawaid-kc2u.vercel.app\n\n📌 *${benefit.title}*\n\n${benefit.content}\n\n✍️ من فوائد: ${authorName}\n${benefit.source ? `📚 المصدر: ${benefit.source}` : ""}`;
 
           // 3. Verify share capability using the exact condition:
           if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -636,12 +662,12 @@ export const ShareCardModal: React.FC<ShareCardModalProps> = ({
 
   // Helper quick social share links (text fallback)
   const getWhatsAppShareUrl = () => {
-    const text = `📌 *${benefit.title}*\n\n${benefit.content}\n\n✍️ من فوائد: ${authorName}\n${benefit.source ? `📚 المصدر: ${benefit.source}` : ''}\n\nتم النشر بواسطة تطبيق جامع الفوائد 📚\nقيد فوائدك عبر هذا الرابط\nhttps://jame-al-fawaid-kc2u.vercel.app`;
+    const text = `تم النشر بواسطة تطبيق جامع الفوائد 📚\nقيد فوائدك عبر هذا الرابط:\nhttps://jame-al-fawaid-kc2u.vercel.app\n\n📌 *${benefit.title}*\n\n${benefit.content}\n\n✍️ من فوائد: ${authorName}\n${benefit.source ? `📚 المصدر: ${benefit.source}` : ""}`;
     return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
   };
 
   const getTelegramShareUrl = () => {
-    const text = `📌 *${benefit.title}*\n\n${benefit.content}\n\n✍️ من فوائد: ${authorName}\n${benefit.source ? `📚 المصدر: ${benefit.source}` : ''}\n\nتم النشر بواسطة تطبيق جامع الفوائد 📚\nقيد فوائدك عبر هذا الرابط\nhttps://jame-al-fawaid-kc2u.vercel.app`;
+    const text = `تم النشر بواسطة تطبيق جامع الفوائد 📚\nقيد فوائدك عبر هذا الرابط:\nhttps://jame-al-fawaid-kc2u.vercel.app\n\n📌 *${benefit.title}*\n\n${benefit.content}\n\n✍️ من فوائد: ${authorName}\n${benefit.source ? `📚 المصدر: ${benefit.source}` : ""}`;
     return `https://t.me/share/url?url=&text=${encodeURIComponent(text)}`;
   };
 

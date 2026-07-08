@@ -293,24 +293,22 @@ const PORT = 3000;
         deviceId: deviceId || 'unknown'
       });
 
-      // Update persistent stats
+      // Update persistent stats efficiently without querying all documents on every event
       try {
         const statsDocRef = doc(db, "app_state", "stats");
         const statsSnap = await getDoc(statsDocRef);
         let totalVisitors = 1;
+        let totalSubscribers = 0;
         if (statsSnap.exists()) {
-          totalVisitors = statsSnap.data().totalVisitors || 1;
+          const d = statsSnap.data();
+          totalVisitors = d.totalVisitors || 1;
+          totalSubscribers = d.totalSubscribers || 0;
         }
-        
-        const allKeysSnap = await getDocs(collection(db, "activation_keys"));
-        let usedKeysCount = 0;
-        allKeysSnap.forEach((docSnap) => {
-          if (docSnap.data().used) usedKeysCount++;
-        });
+        totalSubscribers += 1;
 
         await setDoc(statsDocRef, {
           totalVisitors,
-          totalSubscribers: usedKeysCount
+          totalSubscribers
         }, { merge: true });
       } catch (err) {
         console.error("Error updating stats during activation:", err);
@@ -323,7 +321,7 @@ const PORT = 3000;
     }
   });
 
-  // API Route: Register Visit
+  // API Route: Register Visit with detailed logs in Firestore
   app.post("/api/stats/visit", async (req, res) => {
     try {
       if (!db) {
@@ -342,27 +340,129 @@ const PORT = 3000;
       }
       
       totalVisitors += 1;
-      
-      try {
-        const allKeysSnap = await getDocs(collection(db, "activation_keys"));
-        let usedKeysCount = 0;
-        allKeysSnap.forEach((docSnap) => {
-          if (docSnap.data().used) usedKeysCount++;
-        });
-        totalSubscribers = usedKeysCount;
-      } catch (err) {
-        console.error("Error counting keys during stats visit:", err);
-      }
 
+      // Update stats document directly with atomic incremented values
       await setDoc(statsDocRef, {
         totalVisitors,
         totalSubscribers
       }, { merge: true });
 
+      // Save highly accurate and detailed visit entry in "visits" collection
+      try {
+        const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown";
+        const userAgent = req.headers["user-agent"] || "unknown";
+        const referrer = req.headers["referer"] || "direct";
+        const visitId = `visit_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        
+        await setDoc(doc(db, "visits", visitId), {
+          id: visitId,
+          timestamp: Date.now(),
+          ip: typeof ip === 'string' ? ip : String(ip),
+          userAgent: typeof userAgent === 'string' ? userAgent : String(userAgent),
+          referrer: typeof referrer === 'string' ? referrer : String(referrer),
+          dateString: new Date().toISOString().split('T')[0],
+          timeString: new Date().toLocaleTimeString('ar-EG', { timeZone: 'Asia/Riyadh' })
+        });
+      } catch (visitErr) {
+        console.error("Error saving detailed visit record to Firestore:", visitErr);
+      }
+
       return res.json({ success: true, stats: { totalVisitors, totalSubscribers } });
     } catch (error) {
       console.error("Stats visit error:", error);
       return res.status(500).json({ success: false, message: "حدث خطأ أثناء تسجيل الزيارة." });
+    }
+  });
+
+  // API Route: Set User passcode (PIN lock) associated with their activation key in Firebase
+  app.post("/api/user/set-passcode", async (req, res) => {
+    try {
+      const { code, passcode } = req.body;
+      if (!code) {
+        return res.status(400).json({ success: false, message: "كود التفعيل مطلوب لحماية التطبيق." });
+      }
+
+      if (!db) {
+        return res.status(500).json({ success: false, message: "قاعدة البيانات غير متصلة بالخادم حالياً." });
+      }
+
+      const normalizedCode = code.trim().toUpperCase();
+      const MASTER_KEYS = [
+        "ABU-OSID-VIP-7777",
+        "ABU-OSID-GOLD-PRO-9999",
+        "ABU-OSID-MASTER-9999-PREMIUM"
+      ];
+
+      const keyDocRef = MASTER_KEYS.includes(normalizedCode)
+        ? doc(db, "activation_keys", `MASTER_${normalizedCode}`)
+        : doc(db, "activation_keys", normalizedCode);
+
+      if (!MASTER_KEYS.includes(normalizedCode)) {
+        const keyDocSnap = await getDoc(keyDocRef);
+        if (!keyDocSnap.exists()) {
+          return res.status(400).json({ success: false, message: "كود التفعيل غير صالح للربط بالرقم السري." });
+        }
+      }
+
+      // Save passcode inside Firestore
+      await setDoc(keyDocRef, {
+        userPasscode: passcode ? passcode.trim() : null,
+        passcodeUpdatedAt: Date.now()
+      }, { merge: true });
+
+      return res.json({ success: true, message: "تم حفظ وتزامن الرقم السري لحماية مدونتك بنجاح على قاعدة البيانات السحابية! 🔒" });
+    } catch (error: any) {
+      console.error("Set user passcode error:", error);
+      return res.status(500).json({ success: false, message: error.message || "حدث خطأ أثناء مزامنة الرقم السري." });
+    }
+  });
+
+  // API Route: Verify User passcode (PIN lock) from Firebase
+  app.post("/api/user/verify-passcode", async (req, res) => {
+    try {
+      const { code, passcode } = req.body;
+      if (!code) {
+        return res.status(400).json({ success: false, message: "كود التفعيل مطلوب للتحقق." });
+      }
+
+      if (!db) {
+        return res.status(500).json({ success: false, message: "قاعدة البيانات غير متصلة بالخادم حالياً." });
+      }
+
+      const normalizedCode = code.trim().toUpperCase();
+      const MASTER_KEYS = [
+        "ABU-OSID-VIP-7777",
+        "ABU-OSID-GOLD-PRO-9999",
+        "ABU-OSID-MASTER-9999-PREMIUM"
+      ];
+
+      const keyDocRef = MASTER_KEYS.includes(normalizedCode)
+        ? doc(db, "activation_keys", `MASTER_${normalizedCode}`)
+        : doc(db, "activation_keys", normalizedCode);
+
+      const keyDocSnap = await getDoc(keyDocRef);
+      if (!keyDocSnap.exists()) {
+        if (MASTER_KEYS.includes(normalizedCode)) {
+          return res.json({ success: true, verified: true, hasPasscode: false });
+        }
+        return res.status(400).json({ success: false, message: "كود التفعيل غير صحيح." });
+      }
+
+      const keyData = keyDocSnap.data();
+      const savedPasscode = keyData.userPasscode;
+
+      if (!savedPasscode) {
+        return res.json({ success: true, verified: true, hasPasscode: false });
+      }
+
+      if (savedPasscode === passcode.trim()) {
+        return res.json({ success: true, verified: true, hasPasscode: true });
+      } else {
+        return res.status(400).json({ success: false, verified: false, message: "الرمز السري غير صحيح! يرجى إعادة المحاولة." });
+      }
+    } catch (error: any) {
+      console.error("Verify user passcode error:", error);
+      return res.status(500).json({ success: false, message: error.message || "حدث خطأ أثناء التحقق من الرقم السري." });
     }
   });
 

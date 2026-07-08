@@ -1,0 +1,118 @@
+{
+  "entities": {
+    "Backup": {
+      "title": "Backup",
+      "description": "Local or cloud data backup for user's benefits and queries",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the backup"
+        },
+        "timestamp": {
+          "type": "integer",
+          "description": "Timestamp when the backup was created"
+        },
+        "trigger": {
+          "type": "string",
+          "description": "How the backup was triggered (e.g. manual, auto)"
+        },
+        "benefitsCount": {
+          "type": "integer",
+          "description": "Number of benefits backed up"
+        },
+        "queriesCount": {
+          "type": "integer",
+          "description": "Number of queries backed up"
+        },
+        "data": {
+          "type": "string",
+          "description": "Stringified JSON of the backed up data"
+        },
+        "code": {
+          "type": "string",
+          "description": "Activation key used to identify the user"
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user"
+        }
+      },
+      "required": ["id", "timestamp", "data", "code"]
+    },
+    "ActivationKey": {
+      "title": "Activation Key",
+      "description": "License key for activating premium features",
+      "type": "object",
+      "properties": {
+        "used": {
+          "type": "boolean",
+          "description": "Whether the key has been used"
+        },
+        "activatedAt": {
+          "type": "integer",
+          "description": "Timestamp when the key was activated"
+        },
+        "deviceId": {
+          "type": "string",
+          "description": "Device ID associated with the activation"
+        },
+        "note": {
+          "type": "string",
+          "description": "Administrative note about the key"
+        },
+        "createdAt": {
+          "type": "integer",
+          "description": "Timestamp when the key was generated"
+        }
+      },
+      "required": ["used", "createdAt"]
+    },
+    "AdminState": {
+      "title": "Admin State",
+      "description": "Admin configuration and credentials",
+      "type": "object",
+      "properties": {
+        "adminPassword": {
+          "type": "string",
+          "description": "Admin dashboard access password"
+        }
+      },
+      "required": ["adminPassword"]
+    },
+    "StatsState": {
+      "title": "Stats State",
+      "description": "Global statistics for visitors and subscribers",
+      "type": "object",
+      "properties": {
+        "totalVisitors": {
+          "type": "integer",
+          "description": "Total visits logged"
+        },
+        "totalSubscribers": {
+          "type": "integer",
+          "description": "Total active subscribers"
+        }
+      },
+      "required": ["totalVisitors", "totalSubscribers"]
+    }
+  },
+  "firestore": {
+    "/backups/{backupId}": {
+      "schema": "Backup",
+      "description": "Client-side manual/auto backups of scholar's data"
+    },
+    "/cloud_backups/{backupId}": {
+      "schema": "Backup",
+      "description": "Cloud-synced backups managed through the server"
+    },
+    "/activation_keys/{key}": {
+      "schema": "ActivationKey",
+      "description": "Pre-seeded or admin-generated premium licensing keys"
+    },
+    "/app_state/{documentId}": {
+      "schema": "object",
+      "description": "Global states including admin settings and system-wide counters"
+    }
+  }
+}
