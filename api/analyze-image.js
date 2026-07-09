@@ -82,22 +82,51 @@ export default async function handler(req, res) {
       "4. إذا لم تتمكن من قراءة بعض الكلمات ضعها بين معقوفتين [غير واضح] أو قدرها حسب السياق.\n" +
       "النص المستخرج:";
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: {
-        parts: [
-          imagePart,
-          { text: "الرجاء قراءة الصورة المرفقة واستخراج كامل النص العربي المكتوب فيها بدقة عالية." }
-        ]
-      },
-      config: {
-        systemInstruction,
-        temperature: 0.1,
-      }
-    });
+    const modelsToTry = [
+      "gemini-3.5-flash",
+      "gemini-2.5-flash",
+      "gemini-3.1-flash-lite",
+      "gemini-flash-latest"
+    ];
 
-    const text = response.text || "";
-    return res.status(200).json({ success: true, text });
+    let lastError = null;
+    let text = "";
+    let succeededModel = null;
+
+    for (const modelName of modelsToTry) {
+      try {
+        console.log(`Attempting OCR with model on Vercel: ${modelName}`);
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: {
+            parts: [
+              imagePart,
+              { text: "الرجاء قراءة الصورة المرفقة واستخراج كامل النص العربي المكتوب فيها بدقة عالية." }
+            ]
+          },
+          config: {
+            systemInstruction,
+            temperature: 0.1,
+          }
+        });
+
+        if (response && response.text) {
+          text = response.text;
+          succeededModel = modelName;
+          console.log(`OCR Succeeded on Vercel using model: ${modelName}`);
+          break;
+        }
+      } catch (err) {
+        console.warn(`Model ${modelName} failed for OCR on Vercel:`, err.message || err);
+        lastError = err;
+      }
+    }
+
+    if (!text && lastError) {
+      throw lastError;
+    }
+
+    return res.status(200).json({ success: true, text, modelUsed: succeededModel });
   } catch (error) {
     console.error("Vercel Serverless Error:", error);
     return res.status(500).json({
