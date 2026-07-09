@@ -157,8 +157,7 @@ export default function App() {
   const [showPremiumPromo, setShowPremiumPromo] = useState(false);
   const [showWelcome, setShowWelcome] = useState<boolean>(() => {
     try {
-      const dismissed = localStorage.getItem('abuosid_welcome_dismissed') || 
-        document.cookie.split('; ').find(row => row.startsWith('abuosid_welcome_dismissed='))?.split('=')[1];
+      const dismissed = localStorage.getItem('abuosid_welcome_dismissed');
       return dismissed !== 'true';
     } catch (e) {
       return true;
@@ -1181,7 +1180,6 @@ export default function App() {
         onClose={() => {
           try {
             localStorage.setItem('abuosid_welcome_dismissed', 'true');
-            document.cookie = "abuosid_welcome_dismissed=true; max-age=31536000; path=/";
           } catch (e) {
             console.error(e);
           }

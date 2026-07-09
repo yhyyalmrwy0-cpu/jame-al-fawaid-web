@@ -171,28 +171,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     handleCloudBackupRef.current = handleCloudBackup;
   }, [benefits, queries, userEmail, isActivated, settings.programmerName]);
 
-  // Automatically register user's email on the server as a free subscriber
-  React.useEffect(() => {
-    const registerUserOnServer = async (emailToReg: string) => {
-      if (!emailToReg || !emailToReg.trim()) return;
-      try {
-        await fetch(getApiUrl('/api/user/register'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email: emailToReg.trim() }),
-        });
-      } catch (e) {
-        console.error("Failed to register free user on server:", e);
-      }
-    };
-
-    if (userEmail && userEmail.trim()) {
-      registerUserOnServer(userEmail);
-    }
-  }, [userEmail]);
-
 
   const [showDemoKeys, setShowDemoKeys] = useState(false);
   const [demoKeys] = useState<string[]>([
@@ -227,7 +205,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [adminStats, setAdminStats] = useState<{
     totalVisitors: number;
     totalSubscribers: number;
-    totalFreeUsers?: number;
     totalKeys: number;
     usedKeys: number;
     freeKeys: number;
@@ -1987,9 +1964,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     </div>
 
                     {/* Stats Cards */}
-                    <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                       {/* Visitor Stats */}
-                      <div className="p-3.5 rounded-xl bg-brand-cream/10 border border-brand-cream/40 text-center space-y-1 col-span-1">
+                      <div className="p-3.5 rounded-xl bg-brand-cream/10 border border-brand-cream/40 text-center space-y-1 col-span-2 sm:col-span-1">
                         <span className="text-[10px] text-zinc-500 font-bold block">👥 إجمالي الزوار للمنصة</span>
                         <span className="text-xl font-black text-zinc-800 font-mono">
                           {adminStats?.totalVisitors ?? 0}
@@ -1997,23 +1974,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       </div>
 
                       {/* Subscriber Stats */}
-                      <div className="p-3.5 rounded-xl bg-amber-50/60 border border-amber-200 text-center space-y-1 col-span-1">
+                      <div className="p-3.5 rounded-xl bg-amber-50/60 border border-amber-200 text-center space-y-1 col-span-2 sm:col-span-1">
                         <span className="text-[10px] text-amber-800 font-bold block">⭐ المشتركين الفعليين</span>
                         <span className="text-xl font-black text-amber-700 font-mono">
                           {adminStats?.totalSubscribers ?? 0}
                         </span>
                       </div>
 
-                      {/* Free Registered Users */}
-                      <div className="p-3.5 rounded-xl bg-blue-50/60 border border-blue-200 text-center space-y-1 col-span-1">
-                        <span className="text-[10px] text-blue-800 font-bold block">🎁 المسجلين مجاناً</span>
-                        <span className="text-xl font-black text-blue-700 font-mono">
-                          {adminStats?.totalFreeUsers ?? 0}
-                        </span>
-                      </div>
-
                       {/* Total Keys */}
-                      <div className="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200 text-center space-y-1 col-span-1">
+                      <div className="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200 text-center space-y-1">
                         <span className="text-[10px] text-zinc-500 font-bold block">🔑 مجموع المفاتيح</span>
                         <span className="text-xl font-black text-zinc-800 font-mono">
                           {Object.keys(adminKeysList).length}
@@ -2021,7 +1990,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       </div>
 
                       {/* Ready/Free Keys */}
-                      <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-100 text-center space-y-1 col-span-1">
+                      <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-100 text-center space-y-1">
                         <span className="text-[10px] text-emerald-800 font-bold block">🟢 جاهزة للتسليم</span>
                         <span className="text-xl font-black text-emerald-700 font-mono">
                           {(Object.values(adminKeysList) as any[]).filter(k => !k.used).length}
@@ -2029,7 +1998,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       </div>
 
                       {/* Used/Activated Keys */}
-                      <div className="p-3.5 rounded-xl bg-rose-50/60 border border-rose-100 text-center space-y-1 col-span-1">
+                      <div className="p-3.5 rounded-xl bg-rose-50/60 border border-rose-100 text-center space-y-1">
                         <span className="text-[10px] text-rose-800 font-bold block">🔴 مفاتيح مستخدمة</span>
                         <span className="text-xl font-black text-rose-700 font-mono">
                           {(Object.values(adminKeysList) as any[]).filter(k => k.used).length}
