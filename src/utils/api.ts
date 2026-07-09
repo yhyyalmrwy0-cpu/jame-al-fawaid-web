@@ -31,6 +31,14 @@ export const getApiUrl = (path: string): string => {
       if (!isOcrRoute) {
         baseUrl = 'https://ais-pre-nycqmzc2bzipjgz5op6wxm-55449569636.europe-west2.run.app';
       }
+    } else if (isStudioPreview) {
+      // We are in the AI Studio preview environment.
+      // If there is a subpath prefix (like /3000/ or /1416/), we MUST prepend it to local API requests
+      // so the reverse proxy can correctly route the requests to our container!
+      const match = window.location.pathname.match(/^\/([0-9]+)/);
+      if (match) {
+        baseUrl = `/${match[1]}`;
+      }
     }
   }
 
