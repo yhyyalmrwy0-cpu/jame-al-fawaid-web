@@ -16,20 +16,19 @@ import {
 
 // Firebase Configuration from firebase-applet-config.json
 const firebaseConfig = {
-  apiKey: "AIzaSyDPCFId6_QL3jnwiL8_6MrHvCJSC0wwdik",
-  authDomain: "jame-al-fawaid.firebaseapp.com",
-  databaseURL: "https://jame-al-fawaid-default-rtdb.firebaseio.com",
-  projectId: "jame-al-fawaid",
-  storageBucket: "jame-al-fawaid.firebasestorage.app",
-  messagingSenderId: "259362855839",
-  appId: "1:259362855839:web:a475f4edade78b9707fbaa"
+  apiKey: "AIzaSyDlUkuAywTTWCPAZZ0xMcVEmD3wCQsMu_0",
+  authDomain: "silken-being-x2t1j.firebaseapp.com",
+  projectId: "silken-being-x2t1j",
+  storageBucket: "silken-being-x2t1j.firebasestorage.app",
+  messagingSenderId: "808282091165",
+  appId: "1:808282091165:web:c7790bbdc985bb4c9fee74"
 };
 
 // Initialize Firebase App
 const app = initializeApp(firebaseConfig);
 
 // Initialize Firestore with the specific custom database ID
-export const db = getFirestore(app);
+export const db = getFirestore(app, "ai-studio-remix-e036a879-8e87-4762-b7b9-e2b68e5e4e8c");
 
 export interface FirebaseBackup {
   id: string;

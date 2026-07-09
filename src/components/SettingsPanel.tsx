@@ -9,11 +9,6 @@ import {
   downloadFromGoogleDrive, 
   deleteFromGoogleDrive 
 } from '../utils/googleDrive';
-import {
-  saveBackupToFirebase,
-  listBackupsFromFirebase,
-  deleteBackupFromFirebase
-} from '../lib/firebase';
 import { AppLogo } from './AppLogo';
 import { getApiUrl } from '../utils/api';
 
@@ -30,6 +25,7 @@ interface SettingsPanelProps {
   onShowPremiumPromo?: () => void;
   isControlPanelVisible?: boolean;
   onUnlockControlPanel?: () => void;
+  onShowWelcome?: () => void;
 }
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -45,6 +41,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onShowPremiumPromo,
   isControlPanelVisible,
   onUnlockControlPanel,
+  onShowWelcome,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingBackupAfterLoginRef = useRef<boolean>(false);
@@ -152,8 +149,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   });
   const [activationKey, setActivationKey] = useState('');
   const [isActivating, setIsActivating] = useState(false);
-  const [tempPasscode, setTempPasscode] = useState(settings.appPasscode || '');
-  const [isSyncingPasscode, setIsSyncingPasscode] = useState(false);
   const [userEmail, setUserEmail] = useState(() => {
     try {
       return localStorage.getItem('abuosid_user_email') || '';
@@ -175,6 +170,28 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   React.useEffect(() => {
     handleCloudBackupRef.current = handleCloudBackup;
   }, [benefits, queries, userEmail, isActivated, settings.programmerName]);
+
+  // Automatically register user's email on the server as a free subscriber
+  React.useEffect(() => {
+    const registerUserOnServer = async (emailToReg: string) => {
+      if (!emailToReg || !emailToReg.trim()) return;
+      try {
+        await fetch(getApiUrl('/api/user/register'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email: emailToReg.trim() }),
+        });
+      } catch (e) {
+        console.error("Failed to register free user on server:", e);
+      }
+    };
+
+    if (userEmail && userEmail.trim()) {
+      registerUserOnServer(userEmail);
+    }
+  }, [userEmail]);
 
 
   const [showDemoKeys, setShowDemoKeys] = useState(false);
@@ -210,6 +227,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [adminStats, setAdminStats] = useState<{
     totalVisitors: number;
     totalSubscribers: number;
+    totalFreeUsers?: number;
     totalKeys: number;
     usedKeys: number;
     freeKeys: number;
@@ -260,7 +278,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const fetchCloudBackups = async () => {
     const googleToken = localStorage.getItem('abuosid_google_access_token');
     
-    // 1. If Google Drive is connected, fetch backups from Google Drive directly
+    // If Google Drive is connected, fetch backups from Google Drive directly
     if (googleToken) {
       setIsLoadingCloudBackups(true);
       try {
@@ -274,34 +292,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       return;
     }
 
-    // 2. Otherwise use Firebase Cloud Backup (Durable and serverless-friendly!)
-    const key = localStorage.getItem('abuosid_activation_key') || '';
-    if (!key) return;
-    setIsLoadingCloudBackups(true);
-    try {
-      const firebaseBackups = await listBackupsFromFirebase(key, userEmail);
-      setCloudBackups(firebaseBackups);
-    } catch (err) {
-      console.error('Error listing Firebase backups, falling back to local server:', err);
-      // Fallback to local server backup if any error
-      try {
-        const response = await fetch(getApiUrl('/api/backup/list'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ code: key, email: userEmail }),
-        });
-        const data = await response.json();
-        if (response.ok && data.success) {
-          setCloudBackups(data.backups);
-        }
-      } catch (innerErr) {
-        console.error('Error listing server backups:', innerErr);
-      }
-    } finally {
-      setIsLoadingCloudBackups(false);
-    }
+    setCloudBackups([]);
   };
 
   // Google OAuth Connection & Popup Handler
@@ -756,9 +747,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   };
 
   const handleCloudBackup = async () => {
+    if (!isActivated) {
+      showToast('ميزة النسخ الاحتياطي السحابي إلى جوجل درايف تتطلب تفعيل كود بريميوم الذهبي 👑', 'warning');
+      return;
+    }
+
     const googleToken = localStorage.getItem('abuosid_google_access_token');
     
-    // 1. If Google Drive is connected, do real upload to Google Drive
     if (googleToken) {
       setIsDriveSyncing(true);
       showToast('جاري رفع نسختك الاحتياطية مباشرة إلى جوجل درايف السحابي... ☁️', 'info');
@@ -780,67 +775,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       return;
     }
 
-    // 2. Otherwise use Firebase Cloud Backup (Durable and serverless-friendly!)
-    if (!isActivated) {
-      showToast('ميزة النسخ الاحتياطي السحابي تتطلب تفعيل كود بريميوم 🔑 أو ربط حساب جوجل درايف مجاناً! ☁️', 'info');
-      return;
-    }
-
-    let key = localStorage.getItem('abuosid_activation_key') || '';
-    if (!key && isActivated) {
-      key = 'ABU-OSID-VIP-7777';
-      localStorage.setItem('abuosid_activation_key', key);
-    }
-    if (!key) {
-      showToast('لم يتم العثور على مفتاح التفعيل المحفوظ. يرجى تفعيل الكود أولاً.', 'warning');
-      return;
-    }
-
-    setIsDriveSyncing(true);
-    showToast('جاري حفظ النسخة الاحتياطية سحابياً (Firebase) بأمان... ☁️', 'info');
-
-    try {
-      const backupDataStr = JSON.stringify({ benefits, queries, programmerName: settings.programmerName });
-      await saveBackupToFirebase(key, userEmail, {
-        trigger: 'manual',
-        benefitsCount: benefits.length,
-        queriesCount: queries.length,
-        data: backupDataStr
-      });
-
-      // Best effort to mirror on the server
-      try {
-        await fetch(getApiUrl('/api/backup/save'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            code: key,
-            email: userEmail,
-            backupData: {
-              trigger: 'manual',
-              benefitsCount: benefits.length,
-              queriesCount: queries.length,
-              data: backupDataStr
-            }
-          }),
-        });
-      } catch (serverErr) {
-        console.warn('Server backup mirror skipped or failed:', serverErr);
-      }
-
-      const now = new Date();
-      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-      setLastDriveSync(timeStr);
-      showToast('تم رفع وحفظ النسخة الاحتياطية السحابية بنجاح عبر Firebase! ☁️✅', 'success');
-      fetchCloudBackups(); // Refresh cloud backup list
-    } catch (error) {
-      console.error('Firebase Cloud backup error:', error);
-      showToast('حدث خطأ أثناء رفع النسخة السحابية لـ Firebase.', 'warning');
-    } finally {
-      setIsDriveSyncing(false);
-    }
+    showToast('يرجى ربط حساب جوجل درايف الخاص بك أولاً للنسخ السحابي.', 'warning');
   };
 
   return (
@@ -1396,103 +1331,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 }`}
               >
                 <Download className="w-4 h-4 text-white" />
-                <span>تحميل وتوليد ملف الـ PDF 📥</span>
+                <span>تحميل وتوليد الكتاب الفاخر (PDF) 📗</span>
               </button>
             </div>
           </div>
 
-          {/* Automatic Backup Interval Settings */}
-          <div className="col-span-1 md:col-span-2 p-4 rounded-xl border border-zinc-150 bg-zinc-50 flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden">
-            
-            <div className="space-y-1 z-10">
-              <span className="font-bold text-zinc-850 text-sm block flex items-center gap-1.5 flex-wrap">
-                <span>النسخ الاحتياطي التلقائي (اختياري):</span>
-                <span className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-brand-emerald-dark text-[10px] font-black rounded-full flex items-center gap-0.5 whitespace-nowrap">
-                  ✨ مجاني محلياً بالكامل
-                </span>
-                {!isActivated && (
-                  <span className="px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-bold rounded-full flex items-center gap-0.5 whitespace-nowrap">
-                    ☁️ السحابي (يتطلب تفعيل) 🔒
-                  </span>
-                )}
-              </span>
-              <p className="text-zinc-500 text-xs leading-relaxed">
-                حدد موعداً ومكان حفظ نسخك الاحتياطية تلقائياً (محلياً أو سحابياً) لحماية كتاباتك من الضياع أو الحذف العرضي.
-              </p>
-            </div>
-            
-            <div className="z-10 shrink-0 flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-              {/* Backup Location Selection */}
-              <select
-                value={settings.backupType || 'local'}
-                onChange={(e) => {
-                  const updatedVal = e.target.value as any;
-                  if (updatedVal === 'cloud' && !isActivated) {
-                    showToast('تنبيه: النسخ السحابي التلقائي والربط بالدرايف يتطلب تفعيل كود النسخة الذهبية 👑', 'warning');
-                  }
-                  const updated = {
-                    ...settings,
-                    backupType: updatedVal
-                  };
-                  onUpdateSettings(updated);
-                  setBackupTab(updatedVal);
-                  
-                  if (updatedVal === 'local') {
-                    showToast('تم تفعيل حفظ النسخ التلقائية محلياً على ذاكرة الهاتف بنجاح! 📱📁', 'success');
-                  } else {
-                    showToast('تم ضبط وتفعيل النسخ الاحتياطي والرفع السحابي التلقائي (Firebase / Drive) بنجاح! ☁️✅', 'success');
-                  }
-                }}
-                className="px-3 py-2 rounded-xl border text-xs font-sans font-bold transition-all focus:outline-none focus:ring-2 focus:ring-brand-emerald w-full sm:w-auto bg-white text-zinc-700 border-zinc-200 cursor-pointer hover:bg-zinc-50"
-              >
-                <option value="local">📁 حفظ محلي (على ذاكرة الجهاز)</option>
-                <option value="cloud">☁️ ربط بالدرايف والنسخ السحابي تلقائياً</option>
-              </select>
-
-              {/* Backup Interval Selection */}
-              <select
-                value={settings.autoBackupInterval || 'off'}
-                onChange={(e) => {
-                  const updatedVal = e.target.value as any;
-                  const updated = {
-                    ...settings,
-                    autoBackupInterval: updatedVal
-                  };
-                  onUpdateSettings(updated);
-                  
-                  if (updatedVal !== 'off') {
-                    const isLocal = (settings.backupType || 'local') === 'local';
-                    if (isLocal) {
-                      showToast('تم ضبط النسخ التلقائي لحفظ سجلاتك محلياً على ذاكرة الهاتف بنجاح! 📱📁', 'success');
-                    } else {
-                      showToast('تم ضبط النسخ التلقائي للرفع والحفظ سحابياً بنجاح! ☁️✅', 'success');
-                    }
-                    
-                    if (triggerAutoBackup) {
-                      // Trigger an immediate backup to initialize the list
-                      triggerAutoBackup('manual');
-                      // Update current history rendering immediately
-                      setTimeout(() => {
-                        const saved = localStorage.getItem('abuosid_backups_history');
-                        if (saved) setBackupsHistory(JSON.parse(saved));
-                      }, 500);
-                    }
-                  } else {
-                    showToast('تم إيقاف النسخ الاحتياطي التلقائي.', 'info');
-                  }
-                }}
-                className="px-3 py-2 rounded-xl border text-xs font-sans font-bold transition-all focus:outline-none focus:ring-2 focus:ring-brand-emerald w-full sm:w-auto bg-white text-zinc-700 border-zinc-200 cursor-pointer hover:bg-zinc-50"
-              >
-                <option value="on_change">نسخ تلقائي فوري (عند إضافة أو تعديل أي فائدة)</option>
-                <option value="daily">نسخ تلقائي دوري كل يوم (عند تشغيل التطبيق)</option>
-                <option value="on_exit">نسخ تلقائي عند مغادرة التطبيق أو الخروج 🚪</option>
-                <option value="off">إيقاف النسخ الاحتياطي التلقائي</option>
-              </select>
-            </div>
-          </div>
-
           {/* Responsive Backup Options Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
             {/* Local Phone Backup */}
             <div className="p-4 rounded-xl border border-zinc-100 bg-zinc-50/40 flex flex-col justify-between">
               <div className="space-y-1">
@@ -1535,21 +1380,27 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <div className="p-4 rounded-xl border border-zinc-100 bg-zinc-50/40 flex flex-col justify-between relative overflow-hidden">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-bold text-zinc-800">جوجل درايف المجاني (Google Drive) ☁️</h4>
-                  {driveConnected ? (
-                    <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[9px] px-1.5 py-0.5 rounded-full font-bold">
-                      متصل ونشط مجاناً 🟢
-                    </span>
+                  <h4 className="text-sm font-bold text-zinc-800">جوجل درايف السحابي (Google Drive) ☁️</h4>
+                  {isActivated ? (
+                    driveConnected ? (
+                      <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[9px] px-1.5 py-0.5 rounded-full font-bold">
+                        متصل ونشط 🟢
+                      </span>
+                    ) : (
+                      <span className="bg-sky-50 text-sky-800 border border-sky-200 text-[9px] px-1.5 py-0.5 rounded-full font-bold">
+                        جاهز للربط 🔗
+                      </span>
+                    )
                   ) : (
-                    <span className="bg-zinc-150 text-zinc-600 border border-zinc-200 text-[9px] px-1.5 py-0.5 rounded-full font-bold">
-                      متاح مجاناً 🆓
+                    <span className="bg-amber-50 text-amber-800 border border-amber-200 text-[9px] px-1.5 py-0.5 rounded-full font-bold">
+                      النسخة الذهبية المميزة 👑
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-zinc-500 leading-relaxed">
-                  اربط حساب جوجل الخاص بك لحفظ واستعادة نسخك الاحتياطية تلقائياً أو يدوياً بشكل آمن ومجاني 100% على مساحتك الشخصية الخاصة في Google Drive لحماية مذكراتك وفوائدك.
+                  اربط حساب جوجل الخاص بك لحفظ واستعادة نسخك الاحتياطية يدوياً أو تلقائياً بشكل آمن على مساحتك الشخصية الخاصة في Google Drive لحماية مذكراتك وفوائدك من الضياع.
                 </p>
-                {driveConnected && userEmail && (
+                {isActivated && driveConnected && userEmail && (
                   <p className="text-[10px] text-brand-emerald-dark font-sans font-bold">
                     الحساب المرتبط: {userEmail}
                   </p>
@@ -1557,7 +1408,22 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
               
               <div className="mt-4 pt-3 border-t border-zinc-100 z-10 space-y-2">
-                {driveConnected ? (
+                {!isActivated ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      showToast('النسخ الاحتياطي السحابي لجوجل درايف ميزة خاصة بالنسخة الذهبية المميزة 👑', 'warning');
+                      const section = document.getElementById('activation-section');
+                      if (section) {
+                        section.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    }}
+                    className="w-full py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-zinc-200 hover:bg-zinc-250 text-zinc-500 border border-zinc-300 shadow-sm active:scale-[0.98] duration-150"
+                  >
+                    <Lock className="w-3.5 h-3.5 text-zinc-400" />
+                    <span>تفعيل النسخة الذهبية للربط والنسخ السحابي للدرايف 🔒</span>
+                  </button>
+                ) : driveConnected ? (
                   <div className="flex flex-col gap-2">
                     <button
                       type="button"
@@ -1589,14 +1455,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     onClick={() => handleConnectGoogleDrive(false)}
                     className="w-full py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-white hover:bg-zinc-50 text-brand-emerald border border-brand-emerald/50 shadow-sm hover:shadow active:scale-[0.98] duration-150"
                   >
-                    {/* Google Icon with Tailwind Colors */}
                     <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                       <path
                         fill="#EA4335"
                         d="M12.24 10.285V14.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.859-3.578-7.859-8s3.53-8 7.859-8c2.46 0 4.105 1.025 5.047 1.926l3.227-3.107C18.29 2.11 15.49 1 12.24 1A11 11 0 001.24 12a11 11 0 0011 11c11.5 0 12.24-8.09 12.24-11.285 0-.756-.08-1.332-.178-1.715H12.24z"
                       />
                     </svg>
-                    <span>ربط حساب جوجل درايف مجاناً 🔗</span>
+                    <span>ربط حساب جوجل درايف 🔗</span>
                   </button>
                 )}
 
@@ -1607,67 +1472,89 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 )}
               </div>
             </div>
-
-            {/* Real Secure Cloud Backup */}
+            {/* Automatic Backup Settings Card (Premium Only) */}
             <div className="p-4 rounded-xl border border-zinc-100 bg-zinc-50/40 flex flex-col justify-between relative overflow-hidden">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-bold text-zinc-800">النسخ الاحتياطي السحابي (Firebase) 🔥</h4>
+                  <h4 className="text-sm font-bold text-zinc-800">النسخ الاحتياطي التلقائي المميز 👑</h4>
                   {isActivated ? (
                     <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[9px] px-1.5 py-0.5 rounded-full font-bold">
-                      نشط ومزامن مع سحابة Firebase 🟢
+                      مفعل ونشط 🟢
                     </span>
                   ) : (
                     <span className="bg-amber-50 text-amber-800 border border-amber-200 text-[9px] px-1.5 py-0.5 rounded-full font-bold">
-                      النسخة الذهبية المميزة 👑
+                      ميزة ذهبية 🔒
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-zinc-500 leading-relaxed">
-                  يدعم التطبيق النسخ الاحتياطي السحابي التلقائي واليدوي فائق الأمان والسرعة والاستقرار عبر قاعدة بيانات <b>Firebase Firestore</b> السحابية المخصصة (مستقرة 100% ومستقلة لتفادي قيود المتصفحات والأمان).
+                  قم بجدولة وتفعيل النسخ الاحتياطي التلقائي في الخلفية لحماية مذكراتك وفوائدك العلمية من الضياع، إما محلياً على جهازك أو سحابياً على جوجل درايف.
                 </p>
               </div>
-              
-              <div className="mt-4 pt-3 border-t border-zinc-100 z-10 space-y-2">
-                {isActivated ? (
-                  <button
-                    type="button"
-                    onClick={handleCloudBackup}
-                    disabled={isDriveSyncing}
-                    className="w-full py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-brand-emerald hover:bg-brand-emerald-light text-white shadow-sm hover:shadow active:scale-[0.98] duration-150"
-                  >
-                    {isDriveSyncing ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Cloud className="w-3.5 h-3.5 text-brand-gold-light" />
-                    )}
-                    <span>
-                      {isDriveSyncing ? 'جاري رفع النسخة الاحتياطية...' : 'حفظ ومزامنة نسخة احتياطية سحابية فورية (Firebase) 🔥'}
-                    </span>
-                  </button>
-                ) : (
+
+              {!isActivated ? (
+                <div className="bg-zinc-100/70 rounded-xl p-4 border border-zinc-200/50 flex flex-col items-center justify-center text-center space-y-2 mt-4">
+                  <p className="text-[11px] text-zinc-500 font-bold leading-relaxed">
+                    النسخ الاحتياطي التلقائي (المحلي والسحابي) هو ميزة حصرية خاصة بأصحاب النسخة الذهبية المميزة 👑
+                  </p>
                   <button
                     type="button"
                     onClick={() => {
-                      showToast('النسخ الاحتياطي السحابي ميزة خاصة بالنسخة الذهبية المميزة 👑', 'warning');
+                      showToast('النسخ الاحتياطي التلقائي ميزة خاصة بالنسخة الذهبية المميزة 👑', 'warning');
                       const section = document.getElementById('activation-section');
-                      if (section) {
-                        section.scrollIntoView({ behavior: 'smooth' });
-                      }
+                      if (section) section.scrollIntoView({ behavior: 'smooth' });
                     }}
-                    className="w-full py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-zinc-200 hover:bg-zinc-250 text-zinc-500 border border-zinc-300 shadow-sm active:scale-[0.98] duration-150"
+                    className="px-4 py-2 bg-brand-gold hover:bg-brand-gold-light text-white text-[11px] font-bold rounded-xl flex items-center gap-1 cursor-pointer transition-all shadow-sm"
                   >
-                    <Lock className="w-3.5 h-3.5 text-zinc-400" />
-                    <span>تفعيل النسخة الذهبية للنسخ الاحتياطي السحابي الفوري 🔒</span>
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>تفعيل النسخة الذهبية الآن 🔑</span>
                   </button>
-                )}
+                </div>
+              ) : (
+                <div className="mt-4 pt-3 border-t border-zinc-100 space-y-3">
+                  <div className="space-y-1.5 text-right">
+                    <label className="text-xs font-bold text-zinc-700 block">⏱️ تكرار وجدولة النسخ التلقائي:</label>
+                    <select
+                      value={settings.autoBackupInterval || 'off'}
+                      onChange={(e) => onUpdateSettings({
+                        ...settings,
+                        autoBackupInterval: e.target.value as any
+                      })}
+                      className="w-full px-3 py-2 rounded-xl border border-zinc-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-brand-emerald font-sans font-bold text-zinc-800"
+                    >
+                      <option value="off">إيقاف النسخ الاحتياطي التلقائي ❌</option>
+                      <option value="on_change">تلقائي فوراً عند كل إضافة/تعديل 🔄</option>
+                      <option value="daily">نسخ تلقائي يومي (كل 24 ساعة) 📅</option>
+                      <option value="on_exit">نسخ تلقائي عند إغلاق التطبيق/الصفحة 🚪</option>
+                    </select>
+                  </div>
 
-                {!driveConnected && isActivated && lastDriveSync && (
-                  <p className="text-[10px] text-zinc-400 text-center mt-1.5 font-sans">
-                    آخر مزامنة ناجحة: اليوم في {lastDriveSync}
-                  </p>
-                )}
-              </div>
+                  <div className="space-y-1.5 text-right">
+                    <label className="text-xs font-bold text-zinc-700 block">📂 جهة حفظ النسخة التلقائية:</label>
+                    <select
+                      value={settings.backupType || 'local'}
+                      onChange={(e) => {
+                        const val = e.target.value as 'local' | 'cloud';
+                        if (val === 'cloud' && !driveConnected) {
+                          showToast('يرجى ربط حساب جوجل درايف أولاً لتتمكن من اختيار النسخ التلقائي السحابي.', 'warning');
+                          return;
+                        }
+                        onUpdateSettings({
+                          ...settings,
+                          backupType: val
+                        });
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-zinc-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-brand-emerald font-sans font-bold text-zinc-800"
+                    >
+                      <option value="local">📁 نسخ تلقائي محلي (على ذاكرة الهاتف الداخلية)</option>
+                      <option value="cloud">☁️ نسخ تلقائي سحابي (مباشرة إلى Google Drive المرتبط)</option>
+                    </select>
+                    {settings.backupType === 'cloud' && !driveConnected && (
+                      <p className="text-[10px] text-rose-600 font-bold">⚠️ جوجل درايف غير متصل حالياً! يرجى ربطه أولاً.</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1799,11 +1686,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             /* Render Cloud Backups */
             isLoadingCloudBackups ? (
               <div className="flex flex-col items-center justify-center py-8 gap-2">
-                <RefreshCw className="w-5 h-5 text-brand-emerald animate-spin" />
+                <RefreshCw className="w-5.5 h-5.5 text-brand-emerald animate-spin" />
                 <span className="text-xs text-zinc-400">جاري تحميل النسخ السحابية من الخادم الآمن...</span>
               </div>
             ) : cloudBackups.length === 0 ? (
-              <p className="text-xs text-zinc-400 text-center py-6">لا توجد نسخ احتياطية سحابية محفوظة حالياً.</p>
+              <p className="text-xs text-zinc-400 text-center py-6">لا توجد نسخ احتياطية سحابية محفوظة حالياً على حساب جوجل درايف.</p>
             ) : (
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                 {cloudBackups.map((historyItem) => {
@@ -1811,29 +1698,29 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   const timeStr = `${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
                   const formattedDate = formatToHijriAndGregorian(
                     `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`
-                  ).split(' - ')[0]; // Just the Hijri date for layout space
+                  ).split(' - ')[0];
 
-                  let triggerLabel = 'يدوي سحابي';
-                  let triggerColor = 'bg-emerald-50 text-emerald-800 border-emerald-100';
+                  let triggerLabel = 'يدوي';
+                  let triggerColor = 'bg-zinc-100 text-zinc-700 border-zinc-200';
                   if (historyItem.trigger === 'on_change') {
-                    triggerLabel = 'سحابي عند التحديث';
+                    triggerLabel = 'تلقائي عند التحديث';
                     triggerColor = 'bg-sky-50 text-sky-800 border-sky-100';
                   } else if (historyItem.trigger === 'daily') {
-                    triggerLabel = 'سحابي يومي دوري';
+                    triggerLabel = 'يومي دوري';
                     triggerColor = 'bg-amber-50 text-amber-800 border-amber-100';
                   } else if (historyItem.trigger === 'on_exit') {
-                    triggerLabel = 'سحابي عند المغادرة';
+                    triggerLabel = 'عند مغادرة التطبيق';
                     triggerColor = 'bg-purple-50 text-purple-800 border-purple-100';
                   }
 
                   return (
                     <div
                       key={historyItem.id}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-emerald-100 bg-emerald-50/10 hover:bg-emerald-50/20 transition-colors text-xs gap-3"
+                      className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-zinc-100 bg-zinc-50/50 hover:bg-zinc-50 transition-colors text-xs gap-3"
                     >
                       <div className="flex items-center gap-3">
                         <span className={`px-2 py-0.5 rounded border text-[9px] font-bold shrink-0 ${triggerColor}`}>
-                          {triggerLabel}
+                          {triggerLabel} (جوجل درايف ☁️)
                         </span>
                         <div className="text-right">
                           <span className="font-sans font-bold text-zinc-700 block text-xs leading-none mb-1">{formattedDate} ({timeStr})</span>
@@ -1846,104 +1733,54 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       <div className="flex items-center justify-end gap-1.5 shrink-0">
                         <button
                           type="button"
-                          onClick={async () => {
+                          onClick={() => {
                             if (onRestoreBackup) {
                               requestConfirm(
-                                historyItem.isFirebase 
-                                  ? 'استعادة من سحابة Firebase ☁️🔄' 
-                                  : historyItem.isGoogleDrive 
-                                    ? 'استعادة من جوجل درايف ☁️🔄' 
-                                    : 'استعادة النسخة السحابية ☁️🔄',
-                                historyItem.isFirebase
-                                  ? 'تنبيه: هل أنت متأكد من استرجاع هذه النسخة بالكامل من سحابة Firebase؟ سيتم استبدال جميع السجلات الحالية.'
-                                  : historyItem.isGoogleDrive 
-                                    ? 'تنبيه: هل أنت متأكد من استرجاع هذه النسخة بالكامل من حساب جوجل درايف الخاص بك؟ سيتم استبدال جميع السجلات الحالية.'
-                                    : 'تنبيه: هل أنت متأكد من استرجاع هذه النسخة السحابية بالكامل؟ سيتم استبدال جميع السجلات الحالية بسجلات هذه النسخة السحابية.',
+                                'استعادة النسخة السحابية 🔄',
+                                'تنبيه: هل أنت متأكد من استرجاع هذه النسخة السحابية من جوجل درايف؟ سيتم استبدال جميع السجلات الحالية بنسخة جوجل درايف السحابية.',
                                 async () => {
                                   try {
-                                    let backupDataStr = historyItem.data;
-                                    if (historyItem.isGoogleDrive) {
-                                      const googleToken = localStorage.getItem('abuosid_google_access_token') || '';
-                                      showToast('جاري تحميل ملف النسخة الاحتياطية من جوجل درايف الخاص بك...', 'info');
-                                      backupDataStr = await downloadFromGoogleDrive(googleToken, historyItem.id);
-                                    }
-                                    const ok = onRestoreBackup(backupDataStr);
+                                    showToast('جاري تحميل واستعادة النسخة من جوجل درايف...', 'info');
+                                    const googleToken = localStorage.getItem("abuosid_google_access_token") || "";
+                                    const backupContent = await downloadFromGoogleDrive(googleToken, historyItem.id);
+                                    const ok = onRestoreBackup(backupContent);
                                     if (ok) {
-                                      showToast('تم استعادة بيانات النسخة بنجاح! 🎉', 'success');
+                                      showToast('تم استعادة بيانات النسخة السحابية بنجاح! ☁️✨', 'success');
                                     }
                                   } catch (err) {
-                                    console.error('Failed to restore cloud backup:', err);
-                                    showToast('فشل تحميل واستعادة النسخة الاحتياطية السحابية.', 'warning');
+                                    console.error('Failed to restore from Google Drive:', err);
+                                    showToast('فشل تحميل واستعادة النسخة من جوجل درايف.', 'warning');
                                   }
                                 }
                               );
                             }
                           }}
-                          className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition-colors cursor-pointer text-[10px]"
+                          className="px-2.5 py-1.5 bg-brand-emerald hover:bg-brand-emerald-light text-white rounded-lg font-bold transition-colors cursor-pointer text-[10px]"
                         >
-                          استعادة سحابية 🔄
+                          استعادة هذه النسخة 🔄
                         </button>
                         <button
                           type="button"
-                          onClick={async () => {
+                          onClick={() => {
                             requestConfirm(
-                              historyItem.isGoogleDrive ? 'حذف من جوجل درايف 🗑️' : 'حذف نسخة سحابية 🗑️',
-                              historyItem.isGoogleDrive 
-                                ? 'هل تريد حذف هذا الملف الاحتياطي نهائياً من حساب جوجل درايف الخاص بك؟'
-                                : 'هل تريد حذف هذه النسخة السحابية نهائياً من الخادم؟',
+                              'حذف من جوجل درايف 🗑️',
+                              'هل تريد حذف هذا الملف الاحتياطي نهائياً من حساب جوجل درايف الخاص بك؟',
                               async () => {
-                                if (historyItem.isGoogleDrive) {
-                                  const googleToken = localStorage.getItem('abuosid_google_access_token') || '';
-                                  try {
-                                    showToast('جاري حذف الملف من جوجل درايف...', 'info');
-                                    await deleteFromGoogleDrive(googleToken, historyItem.id);
-                                    showToast('تم حذف النسخة الاحتياطية بنجاح من جوجل درايف.', 'success');
-                                    fetchCloudBackups();
-                                  } catch (err) {
-                                    console.error('Failed to delete from google drive:', err);
-                                    showToast('فشل حذف النسخة من جوجل درايف.', 'warning');
-                                  }
-                                  return;
-                                }
-
-                                if (historyItem.isFirebase) {
-                                  try {
-                                    showToast('جاري حذف الملف من سحابة Firebase...', 'info');
-                                    await deleteBackupFromFirebase(historyItem.id);
-                                    showToast('تم حذف النسخة الاحتياطية بنجاح من Firebase.', 'success');
-                                    fetchCloudBackups();
-                                  } catch (err) {
-                                    console.error('Failed to delete from Firebase:', err);
-                                    showToast('فشل حذف النسخة من Firebase.', 'warning');
-                                  }
-                                  return;
-                                }
-
-                                const key = localStorage.getItem('abuosid_activation_key') || '';
-                                if (!key) return;
+                                const googleToken = localStorage.getItem("abuosid_google_access_token") || "";
                                 try {
-                                  const response = await fetch(getApiUrl('/api/backup/delete'), {
-                                    method: 'POST',
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                    },
-                                    body: JSON.stringify({ code: key, email: userEmail, backupId: historyItem.id }),
-                                  });
-                                  const data = await response.json();
-                                  if (response.ok && data.success) {
-                                    showToast('تم حذف النسخة السحابية بنجاح من الخادم.', 'success');
-                                    fetchCloudBackups();
-                                  } else {
-                                    showToast(data.message || 'فشل حذف النسخة السحابية.', 'warning');
-                                  }
+                                  showToast('جاري حذف الملف من جوجل درايف...', 'info');
+                                  await deleteFromGoogleDrive(googleToken, historyItem.id);
+                                  showToast('تم حذف النسخة الاحتياطية بنجاح من جوجل درايف.', 'success');
+                                  fetchCloudBackups();
                                 } catch (err) {
-                                  showToast('خطأ اتصال بالخادم أثناء حذف النسخة السحابية.', 'warning');
+                                  console.error('Failed to delete from google drive:', err);
+                                  showToast('فشل حذف النسخة من جوجل درايف.', 'warning');
                                 }
                               }
                             );
                           }}
                           className="p-1.5 hover:bg-rose-50 text-rose-600 rounded-lg transition-colors cursor-pointer"
-                          title="حذف النسخة من الخادم"
+                          title="حذف النسخة من جوجل درايف"
                         >
                           🗑️
                         </button>
@@ -1957,131 +1794,34 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
       </div>
 
-      {/* 3. App Passcode Lock & Privacy Section */}
+      {/* 3. Welcome Screen & Help Section */}
       <div className="bg-white rounded-2xl border border-zinc-200 p-5 custom-shadow">
         <h3 className="text-base font-bold text-brand-emerald-dark border-b border-zinc-100 pb-3 mb-4 flex items-center gap-2">
-          <ShieldCheck className="w-5 h-5 text-brand-gold" />
-          تأمين التطبيق والخصوصية (الرقم السري للمستخدمين) 🔒
+          <HelpCircle className="w-5 h-5 text-brand-gold" />
+          الشاشة الترحيبية ومكونات التطبيق 📚✨
         </h3>
 
         <div className="space-y-4 font-sans text-right">
           <div className="p-4 rounded-xl border border-zinc-100 bg-zinc-50/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="space-y-1">
-              <span className="text-sm font-bold text-zinc-800 block">تفعيل قفل الشاشة التلقائي (PIN Lock)</span>
+              <span className="text-sm font-bold text-zinc-800 block">هل ترغب في مراجعة الشاشة الترحيبية والتعليمية؟</span>
               <span className="text-xs text-zinc-500 block leading-relaxed">
-                عند التفعيل، سيُطالب التطبيق بإدخل رقمك السري المكون من 4 أرقام عند فتح جامع الفوائد لحماية سجلاتك وتقييداتك العلمية.
+                اضغط على الزر لعرض نافذة التعريف بمزايا جامع الفوائد وكيفية تدوين الفوائد والشوارد، وتصميم ومشاركة بطاقات الفوائد.
               </span>
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              <label className="relative inline-flex items-center cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={!!settings.isPasscodeEnabled}
-                  onChange={(e) => {
-                    const isEnabled = e.target.checked;
-                    if (isEnabled && !settings.appPasscode) {
-                      showToast('الرجاء تعيين وحفظ رقم سري مكون من 4 أرقام أولاً.', 'warning');
-                      return;
-                    }
-                    
-                    const updated = {
-                      ...settings,
-                      isPasscodeEnabled: isEnabled
-                    };
-                    onUpdateSettings(updated);
-                    showToast(isEnabled ? '🔑 تم تفعيل قفل الشاشة بالرقم السري بنجاح!' : '🔓 تم إيقاف قفل الشاشة بالرقم السري.', 'info');
-                  }}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-zinc-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-emerald"></div>
-              </label>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-xl border border-zinc-100 bg-brand-cream/5 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <span className="text-xs font-bold text-zinc-850 block">تعيين أو تحديث الرقم السري (4 أرقام):</span>
-                <input
-                  type="password"
-                  maxLength={4}
-                  placeholder="أدخل 4 أرقام سرية (مثال: 1234)"
-                  value={tempPasscode}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/[^0-9]/g, '');
-                    setTempPasscode(val);
-                  }}
-                  className="w-full text-center text-xs p-2.5 rounded-lg border border-zinc-300 bg-white focus:outline-none focus:ring-1 focus:ring-brand-gold text-zinc-800 font-mono font-bold tracking-widest"
-                />
-              </div>
-
-              <div className="flex flex-col justify-end">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (!tempPasscode || tempPasscode.length !== 4) {
-                      showToast('الرجاء إدخال رقم سري مكون من 4 أرقام بالضبط لتأمين مدونتك.', 'warning');
-                      return;
-                    }
-
-                    setIsSyncingPasscode(true);
-                    const activeKey = localStorage.getItem('abuosid_activation_key') || 'ABU-OSID-VIP-7777';
-
-                    try {
-                      const response = await fetch(getApiUrl('/api/user/set-passcode'), {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          code: activeKey,
-                          passcode: tempPasscode
-                        })
-                      });
-
-                      const data = await response.json();
-                      if (response.ok && data.success) {
-                        const updated = {
-                          ...settings,
-                          appPasscode: tempPasscode,
-                          isPasscodeEnabled: true
-                        };
-                        onUpdateSettings(updated);
-                        showToast('تم حفظ ومزامنة الرقم السري للمستخدم بنجاح على قاعدة البيانات السحابية! 🔒☁️', 'success');
-                      } else {
-                        showToast(data.message || 'فشل مزامنة الرقم السري.', 'warning');
-                      }
-                    } catch (err) {
-                      console.error('Error setting passcode on server:', err);
-                      const updated = {
-                        ...settings,
-                        appPasscode: tempPasscode,
-                        isPasscodeEnabled: true
-                      };
-                      onUpdateSettings(updated);
-                      showToast('تم حفظ الرقم السري محلياً على جهازك بنجاح. (تعذر الاتصال بقاعدة البيانات السحابية للمزامنة الفورية)', 'info');
-                    } finally {
-                      setIsSyncingPasscode(false);
-                    }
-                  }}
-                  disabled={isSyncingPasscode}
-                  className="py-2.5 px-4 bg-brand-gold hover:bg-brand-gold-light text-white text-xs font-bold rounded-lg transition-all shadow-sm cursor-pointer disabled:bg-zinc-300 flex items-center justify-center gap-2"
-                >
-                  {isSyncingPasscode ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>جاري المزامنة والرفع...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>حفظ ومزامنة الرقم السري سحابياً ☁️🔑</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg bg-zinc-50 border border-zinc-200 text-[10px] text-zinc-500 leading-relaxed text-right">
-              💡 <b>تنبيه أمان سحابي:</b> يتم ربط وتشفير الرقم السري الخاص بك مع مفتاح التنشيط السحابي الفعال ({localStorage.getItem('abuosid_activation_key') || 'نشط'}). عند الانتقال إلى هاتف أو جهاز آخر واستعادة النسخ الاحتياطي، سيُطالبك جامع الفوائد بإدخال نفس هذا الرقم السري لفك التشفير وفتح المدونة، مما يمنع الآخرين من سرقة جهودك العلمية حتى لو حصلوا على ملف النسخة الاحتياطية.
+              <button
+                type="button"
+                onClick={() => {
+                  if (onShowWelcome) {
+                    onShowWelcome();
+                  }
+                }}
+                className="py-2 px-4 bg-brand-emerald hover:bg-brand-emerald-dark text-white text-xs font-bold rounded-lg transition-all shadow-sm cursor-pointer flex items-center gap-2"
+              >
+                <span>عرض الشاشة الترحيبية 📚✨</span>
+              </button>
             </div>
           </div>
         </div>
@@ -2247,9 +1987,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     </div>
 
                     {/* Stats Cards */}
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
                       {/* Visitor Stats */}
-                      <div className="p-3.5 rounded-xl bg-brand-cream/10 border border-brand-cream/40 text-center space-y-1 col-span-2 sm:col-span-1">
+                      <div className="p-3.5 rounded-xl bg-brand-cream/10 border border-brand-cream/40 text-center space-y-1 col-span-1">
                         <span className="text-[10px] text-zinc-500 font-bold block">👥 إجمالي الزوار للمنصة</span>
                         <span className="text-xl font-black text-zinc-800 font-mono">
                           {adminStats?.totalVisitors ?? 0}
@@ -2257,15 +1997,23 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       </div>
 
                       {/* Subscriber Stats */}
-                      <div className="p-3.5 rounded-xl bg-amber-50/60 border border-amber-200 text-center space-y-1 col-span-2 sm:col-span-1">
+                      <div className="p-3.5 rounded-xl bg-amber-50/60 border border-amber-200 text-center space-y-1 col-span-1">
                         <span className="text-[10px] text-amber-800 font-bold block">⭐ المشتركين الفعليين</span>
                         <span className="text-xl font-black text-amber-700 font-mono">
                           {adminStats?.totalSubscribers ?? 0}
                         </span>
                       </div>
 
+                      {/* Free Registered Users */}
+                      <div className="p-3.5 rounded-xl bg-blue-50/60 border border-blue-200 text-center space-y-1 col-span-1">
+                        <span className="text-[10px] text-blue-800 font-bold block">🎁 المسجلين مجاناً</span>
+                        <span className="text-xl font-black text-blue-700 font-mono">
+                          {adminStats?.totalFreeUsers ?? 0}
+                        </span>
+                      </div>
+
                       {/* Total Keys */}
-                      <div className="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200 text-center space-y-1">
+                      <div className="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200 text-center space-y-1 col-span-1">
                         <span className="text-[10px] text-zinc-500 font-bold block">🔑 مجموع المفاتيح</span>
                         <span className="text-xl font-black text-zinc-800 font-mono">
                           {Object.keys(adminKeysList).length}
@@ -2273,7 +2021,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       </div>
 
                       {/* Ready/Free Keys */}
-                      <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-100 text-center space-y-1">
+                      <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-100 text-center space-y-1 col-span-1">
                         <span className="text-[10px] text-emerald-800 font-bold block">🟢 جاهزة للتسليم</span>
                         <span className="text-xl font-black text-emerald-700 font-mono">
                           {(Object.values(adminKeysList) as any[]).filter(k => !k.used).length}
@@ -2281,7 +2029,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       </div>
 
                       {/* Used/Activated Keys */}
-                      <div className="p-3.5 rounded-xl bg-rose-50/60 border border-rose-100 text-center space-y-1">
+                      <div className="p-3.5 rounded-xl bg-rose-50/60 border border-rose-100 text-center space-y-1 col-span-1">
                         <span className="text-[10px] text-rose-800 font-bold block">🔴 مفاتيح مستخدمة</span>
                         <span className="text-xl font-black text-rose-700 font-mono">
                           {(Object.values(adminKeysList) as any[]).filter(k => k.used).length}
