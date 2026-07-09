@@ -29,7 +29,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // Initialize Firestore with the specific custom database ID
-export const db = getFirestore(app, "ai-studio-remix-e036a879-8e87-4762-b7b9-e2b68e5e4e8c");
+export const db = getFirestore(app);
 
 export interface FirebaseBackup {
   id: string;
