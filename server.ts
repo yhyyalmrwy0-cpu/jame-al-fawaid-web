@@ -40,9 +40,10 @@ const PORT = 3000;
 
   // CORS Middleware to allow requests from Vercel or any origin
   app.use((req, res, next) => {
-    res.setHeader("Access-Control-Allow-Origin", "*");
+    const origin = req.headers.origin || "*";
+    res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-requested-with");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-requested-with, accept, origin");
     res.setHeader("Access-Control-Allow-Credentials", "true");
     
     // Handle preflight OPTIONS request
