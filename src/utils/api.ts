@@ -23,7 +23,14 @@ export const getApiUrl = (path: string): string => {
       // The app has been exported/deployed externally (e.g. Vercel, Netlify, custom domain).
       // Connect to the secure, active Cloud Run API gateway container so that the database,
       // activation keys, and cloud backup features continue working seamlessly!
-      baseUrl = 'https://ais-pre-nycqmzc2bzipjgz5op6wxm-55449569636.europe-west2.run.app';
+      
+      // CRITICAL EXCEPTION: Do NOT fallback to Cloud Run for OCR / image analysis routes!
+      // This allows the OCR feature to run natively and serverlessly on Vercel itself,
+      // using Vercel's own environment variables (GEMINI_API_KEY), making it highly reliable and fast.
+      const isOcrRoute = path.includes('analyze-image') || path.includes('ocr');
+      if (!isOcrRoute) {
+        baseUrl = 'https://ais-pre-nycqmzc2bzipjgz5op6wxm-55449569636.europe-west2.run.app';
+      }
     }
   }
 

@@ -102,6 +102,7 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
           {/* Footer actions */}
           <div className="pt-4 border-t border-zinc-800 flex flex-col items-center">
             <button
+              id="welcome-modal-dismiss-btn"
               onClick={onClose}
               className="w-full py-3 bg-gradient-to-r from-brand-emerald to-emerald-700 hover:from-brand-emerald-dark hover:to-emerald-800 text-white font-bold text-sm rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer group"
             >
