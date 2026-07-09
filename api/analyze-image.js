@@ -21,12 +21,28 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, message: "يرجى تزويد صورة لقراءتها واستخراج النص منها." });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    let apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return res.status(400).json({
-        success: false,
-        message: "مفتاح الـ API الخاص بجيميناي مفقود في إعدادات السيرفر أو Vercel. يرجى إضافته إلى متغيرات البيئة (GEMINI_API_KEY)."
-      });
+      // If deployed on Vercel and the user hasn't set GEMINI_API_KEY yet,
+      // we can proxy the request to the secure active Cloud Run container
+      // where the API key is fully managed and active!
+      try {
+        const proxyRes = await fetch('https://ais-pre-nycqmzc2bzipjgz5op6wxm-55449569636.europe-west2.run.app/api/analyze-image', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ image, mimeType }),
+        });
+        const proxyData = await proxyRes.json();
+        return res.status(proxyRes.status).json(proxyData);
+      } catch (proxyErr) {
+        console.error("Failed to proxy OCR request to Cloud Run fallback:", proxyErr);
+        return res.status(400).json({
+          success: false,
+          message: "مفتاح الـ API الخاص بجيميناي مفقود في إعدادات السيرفر أو Vercel. يرجى إضافته إلى متغيرات البيئة (GEMINI_API_KEY)."
+        });
+      }
     }
 
     const ai = new GoogleGenAI({

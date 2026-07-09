@@ -138,7 +138,7 @@ const PORT = 3000;
     }
   });
 
-  // Initialize Firebase using the config file or Environment Variables
+  // Initialize Firebase using the config file, Environment Variables, or hardcoded Fallback Credentials
   let db: any;
 
   try {
@@ -157,11 +157,23 @@ const PORT = 3000;
         appId: process.env.FIREBASE_APP_ID,
         firestoreDatabaseId: process.env.FIREBASE_FIRESTORE_DATABASE_ID || ""
       };
+    } else {
+      // Robust permanent fallback for external deployments like Vercel where files/environment variables might be omitted
+      console.log("Using secure hardcoded Firebase config fallback for Vercel / external serverless deployment...");
+      firebaseConfig = {
+        projectId: "silken-being-x2t1j",
+        appId: "1:808282091165:web:c7790bbdc985bb4c9fee74",
+        apiKey: "AIzaSyDlUkuAywTTWCPAZZ0xMcVEmD3wCQsMu_0",
+        authDomain: "silken-being-x2t1j.firebaseapp.com",
+        firestoreDatabaseId: "ai-studio-remix-e036a879-8e87-4762-b7b9-e2b68e5e4e8c",
+        storageBucket: "silken-being-x2t1j.firebasestorage.app",
+        messagingSenderId: "808282091165"
+      };
     }
 
     if (firebaseConfig) {
       const firebaseApp = initializeApp(firebaseConfig);
-      db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || undefined);
+      db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || firebaseConfig.projectId || undefined);
       console.log("Firebase initialized successfully on server.");
     } else {
       console.warn("No Firebase configuration found (either firebase-applet-config.json or Environment Variables).");
