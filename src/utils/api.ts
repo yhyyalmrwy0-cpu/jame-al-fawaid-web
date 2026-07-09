@@ -21,9 +21,14 @@ export const getApiUrl = (path: string): string => {
 
     if (!isLocal && !isStudioPreview) {
       // The app has been exported/deployed externally (e.g. Vercel, Netlify, custom domain).
-      // Connect to the secure, active Cloud Run API gateway container so that the database,
-      // activation keys, and cloud backup features continue working seamlessly!
-      baseUrl = 'https://ais-pre-nycqmzc2bzipjgz5op6wxm-55449569636.europe-west2.run.app';
+      // If deployed on Vercel, we must use relative path (empty string) to leverage Vercel's serverless functions!
+      const isVercel = host.includes('vercel.app') || host.includes('vercel');
+      if (isVercel) {
+        baseUrl = '';
+      } else {
+        // Connect to the secure, active Cloud Run API gateway container:
+        baseUrl = 'https://ais-pre-nycqmzc2bzipjgz5op6wxm-55449569636.europe-west2.run.app';
+      }
     }
   }
 

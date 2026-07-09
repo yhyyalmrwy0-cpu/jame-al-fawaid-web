@@ -40,10 +40,9 @@ const PORT = 3000;
 
   // CORS Middleware to allow requests from Vercel or any origin
   app.use((req, res, next) => {
-    const origin = req.headers.origin || "*";
-    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-requested-with, accept, origin");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-requested-with");
     res.setHeader("Access-Control-Allow-Credentials", "true");
     
     // Handle preflight OPTIONS request
@@ -138,7 +137,7 @@ const PORT = 3000;
     }
   });
 
-  // Initialize Firebase using the config file, Environment Variables, or hardcoded Fallback Credentials
+  // Initialize Firebase using the config file or Environment Variables
   let db: any;
 
   try {
@@ -157,23 +156,11 @@ const PORT = 3000;
         appId: process.env.FIREBASE_APP_ID,
         firestoreDatabaseId: process.env.FIREBASE_FIRESTORE_DATABASE_ID || ""
       };
-    } else {
-      // Robust permanent fallback for external deployments like Vercel where files/environment variables might be omitted
-      console.log("Using secure hardcoded Firebase config fallback for Vercel / external serverless deployment...");
-      firebaseConfig = {
-        projectId: "silken-being-x2t1j",
-        appId: "1:808282091165:web:c7790bbdc985bb4c9fee74",
-        apiKey: "AIzaSyDlUkuAywTTWCPAZZ0xMcVEmD3wCQsMu_0",
-        authDomain: "silken-being-x2t1j.firebaseapp.com",
-        firestoreDatabaseId: "ai-studio-remix-e036a879-8e87-4762-b7b9-e2b68e5e4e8c",
-        storageBucket: "silken-being-x2t1j.firebasestorage.app",
-        messagingSenderId: "808282091165"
-      };
     }
 
     if (firebaseConfig) {
       const firebaseApp = initializeApp(firebaseConfig);
-      db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || firebaseConfig.projectId || undefined);
+      db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || undefined);
       console.log("Firebase initialized successfully on server.");
     } else {
       console.warn("No Firebase configuration found (either firebase-applet-config.json or Environment Variables).");
@@ -182,13 +169,13 @@ const PORT = 3000;
     console.error("Failed to initialize Firebase on server:", err);
   }
 
-  // Pre-seed initial keys if they do not exist
+  // Pre-seed initial keys if the collection is empty
   async function ensureInitialKeys() {
     if (!db) return;
     try {
-      const testDocRef = doc(db, "activation_keys", "ABU-OSID-PREMIUM-1111");
-      const testSnap = await getDoc(testDocRef);
-      if (!testSnap.exists()) {
+      const keysColl = collection(db, "activation_keys");
+      const snapshot = await getDocs(query(keysColl, limit(1)));
+      if (snapshot.empty) {
         console.log("Seeding initial activation keys into Firestore...");
         const initialKeys: { [key: string]: string } = {
           "ABU-OSID-PREMIUM-1111": "مفتاح تجريبي أول",
@@ -206,9 +193,6 @@ const PORT = 3000;
             createdAt: Date.now()
           });
         }
-        // Initialize keys index
-        const indexDocRef = doc(db, "app_state", "keys_index");
-        await setDoc(indexDocRef, { keys: Object.keys(initialKeys) });
       }
     } catch (error) {
       console.error("Error seeding initial keys in Firestore:", error);
@@ -262,41 +246,6 @@ const PORT = 3000;
       block2 += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return `ABU-OSID-${block1}-${block2}`;
-  }
-
-  async function registerFreeUser(email: string, name?: string) {
-    if (!db || !email || !email.trim()) return;
-    const normalizedEmail = email.trim().toLowerCase();
-    if (normalizedEmail === "abuosid773@gmail.com") return;
-    try {
-      const regDocRef = doc(db, "app_state", "registered_users");
-      const regSnap = await getDoc(regDocRef);
-      let users: { [email: string]: { name?: string, registeredAt: number, lastActive: number } } = {};
-      
-      if (regSnap.exists()) {
-        const data = regSnap.data();
-        if (data.users) {
-          users = data.users;
-        }
-      }
-
-      const now = Date.now();
-      if (!users[normalizedEmail]) {
-        users[normalizedEmail] = {
-          name: name || "",
-          registeredAt: now,
-          lastActive: now
-        };
-      } else {
-        users[normalizedEmail].lastActive = now;
-        if (name) users[normalizedEmail].name = name;
-      }
-
-      await setDoc(regDocRef, { users });
-      console.log(`Registered/updated free user ${normalizedEmail} successfully in app_state/registered_users.`);
-    } catch (error) {
-      console.error("Error registering free user in database:", error);
-    }
   }
 
   // API Route: Verify Activation Key
@@ -517,21 +466,6 @@ const PORT = 3000;
     }
   });
 
-  // API Route: Register Free User manually from Client
-  app.post("/api/user/register", async (req, res) => {
-    try {
-      const { email, name } = req.body;
-      if (!email || !email.trim()) {
-        return res.status(400).json({ success: false, message: "البريد الإلكتروني مطلوب" });
-      }
-      await registerFreeUser(email, name);
-      return res.json({ success: true });
-    } catch (error: any) {
-      console.error("Register free user error:", error);
-      return res.status(500).json({ success: false, message: error.message || "حدث خطأ أثناء تسجيل المستخدم." });
-    }
-  });
-
   // API Route: Get Admin Stats
   app.post("/api/admin/stats", async (req, res) => {
     try {
@@ -552,61 +486,17 @@ const PORT = 3000;
         totalVisitors = statsSnap.data().totalVisitors || 0;
       }
 
-      // Get keys list from keys_index
-      const indexDocRef = doc(db, "app_state", "keys_index");
-      const indexSnap = await getDoc(indexDocRef);
-      let keyIds: string[] = [
-        "ABU-OSID-PREMIUM-1111",
-        "ABU-OSID-PREMIUM-2222",
-        "ABU-OSID-PREMIUM-3333",
-        "ABU-OSID-PREMIUM-4444",
-        "ABU-OSID-PREMIUM-5555"
-      ];
-      
-      if (indexSnap.exists()) {
-        const data = indexSnap.data();
-        if (Array.isArray(data.keys)) {
-          keyIds = data.keys;
-        }
-      } else {
-        await setDoc(indexDocRef, { keys: keyIds });
-      }
-
+      const allKeysSnap = await getDocs(collection(db, "activation_keys"));
       let usedKeysCount = 0;
       let totalKeysCount = 0;
-
-      const fetchPromises = keyIds.map(async (keyId) => {
-        try {
-          const docSnap = await getDoc(doc(db!, "activation_keys", keyId));
-          if (docSnap.exists()) {
-            totalKeysCount++;
-            if (docSnap.data().used) usedKeysCount++;
-          }
-        } catch (err) {
-          console.error(`Error fetching key ${keyId}:`, err);
-        }
+      allKeysSnap.forEach((docSnap) => {
+        totalKeysCount++;
+        if (docSnap.data().used) usedKeysCount++;
       });
-      await Promise.all(fetchPromises);
-
-      // Calculate unique free users
-      let totalFreeUsers = 0;
-      try {
-        const regDocRef = doc(db, "app_state", "registered_users");
-        const regSnap = await getDoc(regDocRef);
-        if (regSnap.exists()) {
-          const data = regSnap.data();
-          if (data.users) {
-            totalFreeUsers = Object.keys(data.users).length;
-          }
-        }
-      } catch (err) {
-        console.error("Error fetching registered_users size:", err);
-      }
 
       await setDoc(statsDocRef, {
         totalVisitors,
-        totalSubscribers: usedKeysCount,
-        totalFreeUsers
+        totalSubscribers: usedKeysCount
       }, { merge: true });
 
       return res.json({
@@ -614,7 +504,6 @@ const PORT = 3000;
         stats: {
           totalVisitors,
           totalSubscribers: usedKeysCount,
-          totalFreeUsers,
           totalKeys: totalKeysCount,
           usedKeys: usedKeysCount,
           freeKeys: totalKeysCount - usedKeysCount
@@ -639,66 +528,23 @@ const PORT = 3000;
         return res.status(500).json({ success: false, message: "قاعدة البيانات غير متصلة بالخادم حالياً." });
       }
 
-      // Get the keys list from keys_index
-      const indexDocRef = doc(db, "app_state", "keys_index");
-      const indexSnap = await getDoc(indexDocRef);
-      let keyIds: string[] = [
-        "ABU-OSID-PREMIUM-1111",
-        "ABU-OSID-PREMIUM-2222",
-        "ABU-OSID-PREMIUM-3333",
-        "ABU-OSID-PREMIUM-4444",
-        "ABU-OSID-PREMIUM-5555"
-      ];
-      
-      if (indexSnap.exists()) {
-        const data = indexSnap.data();
-        if (Array.isArray(data.keys)) {
-          keyIds = data.keys;
-        }
-      } else {
-        await setDoc(indexDocRef, { keys: keyIds });
-      }
-
-      // Fetch all keys in parallel using getDoc
+      const allKeysSnap = await getDocs(collection(db, "activation_keys"));
       const keys: { [key: string]: any } = {};
       let usedKeysCount = 0;
       let totalKeysCount = 0;
 
-      const fetchPromises = keyIds.map(async (keyId) => {
-        try {
-          const docSnap = await getDoc(doc(db!, "activation_keys", keyId));
-          if (docSnap.exists()) {
-            totalKeysCount++;
-            const d = docSnap.data();
-            keys[keyId] = {
-              used: d.used,
-              activatedAt: d.activatedAt,
-              deviceId: d.deviceId,
-              note: d.note || "",
-              createdAt: d.createdAt || 0
-            };
-            if (d.used) usedKeysCount++;
-          }
-        } catch (err) {
-          console.error(`Error fetching key ${keyId}:`, err);
-        }
+      allKeysSnap.forEach((docSnap) => {
+        totalKeysCount++;
+        const d = docSnap.data();
+        keys[docSnap.id] = {
+          used: d.used,
+          activatedAt: d.activatedAt,
+          deviceId: d.deviceId,
+          note: d.note || "",
+          createdAt: d.createdAt || 0
+        };
+        if (d.used) usedKeysCount++;
       });
-      await Promise.all(fetchPromises);
-
-      // Calculate unique free users
-      let totalFreeUsers = 0;
-      try {
-        const regDocRef = doc(db, "app_state", "registered_users");
-        const regSnap = await getDoc(regDocRef);
-        if (regSnap.exists()) {
-          const data = regSnap.data();
-          if (data.users) {
-            totalFreeUsers = Object.keys(data.users).length;
-          }
-        }
-      } catch (err) {
-        console.error("Error fetching registered_users size:", err);
-      }
 
       const statsDocRef = doc(db, "app_state", "stats");
       const statsSnap = await getDoc(statsDocRef);
@@ -713,15 +559,14 @@ const PORT = 3000;
         stats: {
           totalVisitors,
           totalSubscribers: usedKeysCount,
-          totalFreeUsers,
           totalKeys: totalKeysCount,
           usedKeys: usedKeysCount,
           freeKeys: totalKeysCount - usedKeysCount
         }
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Get admin keys error:", error);
-      return res.status(500).json({ success: false, message: "حدث خطأ في جلب مفاتيح التفعيل: " + (error?.message || error) });
+      return res.status(500).json({ success: false, message: "حدث خطأ في جلب مفاتيح التفعيل." });
     }
   });
 
@@ -748,25 +593,6 @@ const PORT = 3000;
         createdAt: Date.now()
       });
 
-      // Add to keys_index array
-      try {
-        const indexDocRef = doc(db, "app_state", "keys_index");
-        const indexSnap = await getDoc(indexDocRef);
-        let keyIds = [];
-        if (indexSnap.exists()) {
-          const data = indexSnap.data();
-          if (Array.isArray(data.keys)) {
-            keyIds = data.keys;
-          }
-        }
-        if (!keyIds.includes(newKey)) {
-          keyIds.push(newKey);
-          await setDoc(indexDocRef, { keys: keyIds });
-        }
-      } catch (e) {
-        console.error("Error updating keys_index during generate-key:", e);
-      }
-
       return res.json({ success: true, key: newKey });
     } catch (error) {
       console.error("Key generation error:", error);
@@ -791,22 +617,6 @@ const PORT = 3000;
       const keyDocSnap = await getDoc(keyDocRef);
       if (keyDocSnap.exists()) {
         await deleteDoc(keyDocRef);
-
-        // Remove from keys_index array
-        try {
-          const indexDocRef = doc(db, "app_state", "keys_index");
-          const indexSnap = await getDoc(indexDocRef);
-          if (indexSnap.exists()) {
-            const data = indexSnap.data();
-            if (Array.isArray(data.keys)) {
-              const updatedKeys = data.keys.filter((k: string) => k !== keyToDelete);
-              await setDoc(indexDocRef, { keys: updatedKeys });
-            }
-          }
-        } catch (e) {
-          console.error("Error updating keys_index during delete-key:", e);
-        }
-
         return res.json({ success: true, message: "تم حذف مفتاح التفعيل بنجاح." });
       } else {
         return res.status(400).json({ success: false, message: "المفتاح غير موجود بالفعل." });
@@ -855,29 +665,11 @@ const PORT = 3000;
         return res.status(500).json({ success: false, message: "قاعدة البيانات غير متصلة بالخادم حالياً." });
       }
 
-      // Get current list of keys from index to delete them individually
-      const indexDocRef = doc(db, "app_state", "keys_index");
-      const indexSnap = await getDoc(indexDocRef);
-      let currentKeys: string[] = [];
-      if (indexSnap.exists()) {
-        currentKeys = indexSnap.data().keys || [];
-      }
-      
-      // Delete each current key
-      for (const key of currentKeys) {
-        await deleteDoc(doc(db, "activation_keys", key));
-      }
-
-      // Also delete standard demo keys just in case
-      const initialKeysList = [
-        "ABU-OSID-PREMIUM-1111",
-        "ABU-OSID-PREMIUM-2222",
-        "ABU-OSID-PREMIUM-3333",
-        "ABU-OSID-PREMIUM-4444",
-        "ABU-OSID-PREMIUM-5555"
-      ];
-      for (const key of initialKeysList) {
-        await deleteDoc(doc(db, "activation_keys", key));
+      // Delete all current keys
+      const keysColl = collection(db, "activation_keys");
+      const allKeysSnap = await getDocs(keysColl);
+      for (const docSnap of allKeysSnap.docs) {
+        await deleteDoc(doc(db, "activation_keys", docSnap.id));
       }
 
       // Seed the initial keys
@@ -897,9 +689,6 @@ const PORT = 3000;
           createdAt: Date.now()
         });
       }
-
-      // Set the index doc back to the initial list
-      await setDoc(indexDocRef, { keys: initialKeysList });
 
       return res.json({ success: true, message: "تمت إعادة تعيين مفاتيح التفعيل لقاعدة البيانات الافتراضية بنجاح." });
     } catch (error) {
@@ -944,10 +733,6 @@ const PORT = 3000;
       };
 
       await setDoc(backupDocRef, newBackup);
-
-      if (email) {
-        await registerFreeUser(email);
-      }
 
       // Clean up older backups for this key/email combo if they exceed 10
       try {
@@ -1166,10 +951,6 @@ const PORT = 3000;
         }
       } catch (err) {
         console.error("Failed to fetch Google user info:", err);
-      }
-
-      if (email) {
-        await registerFreeUser(email, name);
       }
 
       // Return a complete HTML with postMessage and self-close

@@ -86,7 +86,8 @@ export const listBackupsFromFirebase = async (
   
   let q = query(
     backupsColl, 
-    where("code", "==", normalizedCode)
+    where("code", "==", normalizedCode),
+    orderBy("timestamp", "desc")
   );
 
   const querySnapshot = await getDocs(q);
@@ -109,9 +110,6 @@ export const listBackupsFromFirebase = async (
       isFirebase: true
     });
   });
-
-  // Sort by timestamp descending in memory to avoid Firestore composite index requirement
-  backups.sort((a, b) => b.timestamp - a.timestamp);
 
   return backups;
 };

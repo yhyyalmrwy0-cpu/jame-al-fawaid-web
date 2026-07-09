@@ -95,30 +95,6 @@
         }
       },
       "required": ["totalVisitors", "totalSubscribers"]
-    },
-    "RegisteredUser": {
-      "title": "Registered User",
-      "description": "Information about users registered for free (logged in via email)",
-      "type": "object",
-      "properties": {
-        "email": {
-          "type": "string",
-          "description": "Unique email address"
-        },
-        "name": {
-          "type": "string",
-          "description": "Name of the user"
-        },
-        "registeredAt": {
-          "type": "integer",
-          "description": "Timestamp when the user registered"
-        },
-        "lastActive": {
-          "type": "integer",
-          "description": "Timestamp of last user activity"
-        }
-      },
-      "required": ["email", "registeredAt"]
     }
   },
   "firestore": {
@@ -137,10 +113,6 @@
     "/app_state/{documentId}": {
       "schema": "object",
       "description": "Global states including admin settings and system-wide counters"
-    },
-    "/registered_users/{email}": {
-      "schema": "RegisteredUser",
-      "description": "Unique record of registered free users"
     }
   }
 }

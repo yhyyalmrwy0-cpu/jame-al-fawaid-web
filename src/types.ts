@@ -29,6 +29,8 @@ export interface AppSettings {
   autoBackupInterval?: 'on_change' | 'daily' | 'on_exit' | 'off';
   lastBackupTimestamp?: number;
   backupType?: 'local' | 'cloud';
+  appPasscode?: string; // 4-digit PIN stored securely (can be synced to Firebase)
+  isPasscodeEnabled?: boolean; // Whether PIN lock is active on startup
 }
 
 export const CATEGORIES = [
