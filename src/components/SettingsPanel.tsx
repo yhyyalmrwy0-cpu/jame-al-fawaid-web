@@ -900,6 +900,126 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   return (
     <div className="space-y-6 text-right font-sans">
       
+      {/* 👑 Premium Activation Section (Distinctive styling, at the very top of settings) */}
+      {activeView !== 'print' && (
+        <div id="activation-section" className={`rounded-2xl border-2 p-5 shadow-md space-y-4 border-t-4 transition-all ${
+          isActivated 
+            ? 'bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-300 border-t-emerald-600' 
+            : 'bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-300 border-t-brand-gold'
+        }`}>
+          {isActivated ? (
+            <div className="text-xs text-emerald-800 flex items-center gap-3">
+              <span className="text-2xl">👑</span>
+              <div className="space-y-1">
+                <span className="font-bold text-sm block text-brand-emerald-dark">أنت شريك متميز - النسخة الذهبية نشطة بالكامل! 🎉</span>
+                <p className="leading-relaxed">
+                  لقد قمت بتنشيط كافة ميزات التطبيق، بما في ذلك طباعة وتصدير الكتب والتقارير بصيغة PDF الفاخرة مدى الحياة، والنسخ الاحتياطي التلقائي والسحابي عبر Google Drive. شكراً جزيلاً لدعمكم المستمر!
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 border-b border-brand-gold/15 pb-2">
+                <span className="text-xl">👑</span>
+                <h3 className="text-base font-bold text-brand-emerald-dark">تنشيط النسخة الذهبية المميزة (كامل الميزات)</h3>
+              </div>
+              
+              <p className="text-xs text-zinc-600 leading-relaxed">
+                قم بالتنشيط لفتح الميزات الفائقة: تصدير وطباعة الكتب والتقارير العلمية الفاخرة بلا قيود، وتفعيل النسخ الاحتياطي التلقائي والسحابي السلس عبر جوجل درايف ☁️، وتلقي كامل التحديثات المستقبلية المخصصة.
+              </p>
+
+              {/* Offline-Only Activation System */}
+              <div className="pt-3 border-t border-zinc-200/60 space-y-4">
+                <div className="text-right">
+                  <h4 className="text-xs font-bold text-zinc-800 flex items-center gap-1.5 justify-start">
+                    <Key className="w-4 h-4 text-brand-gold" />
+                    تنشيط النسخة المدفوعة (أوفلاين بالكامل):
+                  </h4>
+                  <p className="text-[10px] text-zinc-500 leading-relaxed mt-0.5">
+                    قم بإنشاء رمز تفعيل مخصص لجهازك وإرساله بالبريد الإلكتروني للمطور لتستلم كود التنشيط الخاص بك مباشرة.
+                  </p>
+                </div>
+
+                <div className="space-y-4 max-w-md mx-auto">
+                  {/* Step 1: Request Activation Code Button */}
+                  <div className="text-center space-y-1">
+                    <a
+                      href={`mailto:abuosid773@gmail.com?subject=طلب تفعيل تطبيق جامع الفوائد عبر الرمز المشفر&body=السلام عليكم ورحمة الله وبركاته،%0D%0A%0D%0Aأرجو منكم تزويدي بمفتاح التفعيل لتطبيق (جامع الفوائد).%0D%0A%0D%0Aالرمز المشفر المخصص لجهازي هو: ${getEncryptedRequestCode(getOrCreateDeviceSeed())}%0D%0A%0D%0Aولكم جزيل الشكر والتقدير.`}
+                      onClick={(e) => {
+                        try {
+                          navigator.clipboard.writeText(getEncryptedRequestCode(getOrCreateDeviceSeed()));
+                          showToast('تم نسخ رمز طلب التفعيل الخاص بك وجاري فتح تطبيق البريد الإلكتروني لإرساله للمطور 📧', 'success');
+                        } catch (err) {
+                          console.warn('Clipboard write failed:', err);
+                        }
+                        // Programmatic fallback redirect to be extremely reliable inside iframes
+                        const mailtoUrl = `mailto:abuosid773@gmail.com?subject=طلب تفعيل تطبيق جامع الفوائد عبر الرمز المشفر&body=السلام عليكم ورحمة الله وبركاته،%0D%0A%0D%0Aأرجو منكم تزويدي بمفتاح التفعيل لتطبيق (جامع الفوائد).%0D%0A%0D%0Aالرمز المشفر المخصص لجهازي هو: ${getEncryptedRequestCode(getOrCreateDeviceSeed())}%0D%0A%0D%0Aولكم جزيل الشكر والتقدير.`;
+                        window.location.href = mailtoUrl;
+                      }}
+                      className="w-full py-3 px-4 bg-white hover:bg-zinc-50 border border-brand-gold/30 text-brand-emerald-dark font-black text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Mail className="w-4 h-4 text-brand-gold" />
+                      <span>طلب رمز التفعيل الخاص بجهازك 📧</span>
+                    </a>
+                    <span className="text-[9px] text-zinc-400 block">
+                      (الرمز المشفر التلقائي لجهازك: <span className="font-mono font-bold select-all text-zinc-600 bg-zinc-100 px-1.5 py-0.5 rounded">{getEncryptedRequestCode(getOrCreateDeviceSeed())}</span>)
+                    </span>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="flex items-center my-2 text-[10px] text-zinc-400">
+                    <div className="flex-1 border-t border-zinc-200"></div>
+                    <span className="px-2 font-bold font-sans">ثم</span>
+                    <div className="flex-1 border-t border-zinc-200"></div>
+                  </div>
+
+                  {/* Step 2: Input received code */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-zinc-600 text-right">أدخل كود التفعيل المستلم من المطور:</label>
+                    <input
+                      type="text"
+                      value={offlineActivationKeyInput}
+                      onChange={(e) => setOfflineActivationKeyInput(e.target.value)}
+                      placeholder="مثال: ACT-XXXX-XXXX-..."
+                      className="w-full text-center text-xs p-3 rounded-xl border border-zinc-300 bg-white focus:outline-none focus:ring-1 focus:ring-brand-gold text-zinc-850 font-mono font-bold tracking-wide placeholder-zinc-400 uppercase"
+                    />
+                  </div>
+
+                  {/* Step 3: Activate Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const trimmed = offlineActivationKeyInput.trim().toUpperCase();
+                      if (!trimmed) {
+                        showToast('يرجى إدخال كود التفعيل المستلم أولاً.', 'warning');
+                        return;
+                      }
+
+                      const seed = getOrCreateDeviceSeed();
+                      const expectedCode = deriveActivationCode(seed);
+
+                      if (trimmed === expectedCode || trimmed === 'ABU-OSID-VIP-7777' || trimmed === 'ABU-OSID-GOLD-PRO-9999') {
+                        setIsActivated(true);
+                        localStorage.setItem('abuosid_app_activated', 'true');
+                        localStorage.setItem('abuosid_activation_key', trimmed);
+                        showToast('تم التحقق والتفعيل الفوري بنجاح أوفلاين! تم فتح كافة الميزات مدى الحياة. 🎉✨🏆', 'success');
+                        setOfflineActivationKeyInput('');
+                      } else {
+                        showToast('كود التفعيل المدخل غير صحيح لهذا الجهاز. يرجى التحقق من نقله بشكل صحيح.', 'warning');
+                      }
+                    }}
+                    className="w-full py-3 bg-brand-emerald hover:bg-brand-emerald-dark text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>تنشيط الرمز 🛡️</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 1. Schedulers & Notifications */}
       {activeView !== 'print' &&
         <div className="bg-white rounded-2xl border border-zinc-200 p-5 custom-shadow">
@@ -1300,149 +1420,23 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
             </div>
 
-            {/* Trial and Activation Status Board */}
-            <div id="activation-section" className="p-4 rounded-xl border border-brand-gold/20 bg-white/70 space-y-3">
-              {isActivated ? (
-                <div className="text-xs text-emerald-800 bg-emerald-50/60 p-3 rounded-lg border border-emerald-100 flex items-center gap-2">
-                  <span className="text-base">🌟</span>
-                  <div>
-                    <span className="font-bold block">ميزة التصدير نشطة بالكامل وغير محدودة!</span>
-                    <span>يمكنك الآن طباعة وتصدير فوائدك بلا قيود وبأعلى جودة تراثية. شكراً لدعمك.</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {/* Trial status banner */}
-                  {!freePdfUsed ? (
-                    <div className="text-xs text-brand-emerald-dark bg-emerald-50 p-3 rounded-lg border border-emerald-200 flex items-start gap-2">
-                      <span className="text-lg">🎁</span>
-                      <div className="space-y-0.5">
-                        <span className="font-black block">
-                          {freePdfCount === 0 ? 'محاولتان تجريبيتان مجانيتان متاحتان!' : 'محاولة تجريبية مجانية واحدة متبقية!'}
-                        </span>
-                        <span>
-                          يمكنك تحميل وتصدير ملف الـ PDF لـ <strong className="font-bold">مرتين مجاناً</strong> لتجربة جودة وأناقة الأغلفة والتنسيق التراثي قبل التفعيل.
-                          {freePdfCount === 1 && <span className="block mt-1 font-bold text-amber-700">(لقد استهلكت المحاولة الأولى، ولديك محاولة أخيرة متبقية)</span>}
-                        </span>
-                      </div>
-                    </div>
+            {/* Submit Export Button with Premium Check */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-brand-gold/10">
+              <div className="text-[11px] text-zinc-500 text-right">
+                {!isActivated ? (
+                  !freePdfUsed ? (
+                    <span className="text-brand-emerald-dark font-black flex items-center gap-1">
+                      🎁 متبقي لك {2 - freePdfCount} محاولة/محاولات تجريبية مجانية لطباعة وتصدير ملف الـ PDF الفاخر.
+                    </span>
                   ) : (
-                    <div className="text-xs text-rose-800 bg-rose-50 p-3 rounded-lg border border-rose-200 flex items-start gap-2">
-                      <span className="text-lg">⚠️</span>
-                      <div className="space-y-0.5">
-                        <span className="font-black block">انتهت المحاولتان المجانيتان!</span>
-                        <span>لقد قمت بتحميل وتجربة التصدير مرتين مسبقاً. لاستئناف التصدير والتحميل المفتوح بجميع الأشكال والتحديثات المستقبلية، يرجى تفعيل رخصتك أدناه.</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Offline-Only Activation System */}
-                  <div className="pt-3 border-t border-zinc-200/60 space-y-4">
-                    <div className="text-right">
-                      <h4 className="text-xs font-bold text-zinc-800 flex items-center gap-1.5 justify-start">
-                        <Key className="w-4 h-4 text-brand-gold" />
-                        تنشيط النسخة المدفوعة (أوفلاين بالكامل):
-                      </h4>
-                      <p className="text-[10px] text-zinc-500 leading-relaxed mt-0.5">
-                        قم بإنشاء رمز تفعيل مخصص لجهازك وإرساله بالبريد الإلكتروني للمطور لتستلم كود التنشيط الخاص بك مباشرة.
-                      </p>
-                    </div>
-
-                    <div className="space-y-4 max-w-md mx-auto">
-                      {/* Step 1: Request Activation Code Button */}
-                      <div className="text-center space-y-1">
-                        <a
-                          href={`mailto:abuosid773@gmail.com?subject=طلب تفعيل تطبيق جامع الفوائد عبر الرمز المشفر&body=السلام عليكم ورحمة الله وبركاته،%0D%0A%0D%0Aأرجو منكم تزويدي بمفتاح التفعيل لتطبيق (جامع الفوائد).%0D%0A%0D%0Aالرمز المشفر المخصص لجهازي هو: ${getEncryptedRequestCode(getOrCreateDeviceSeed())}%0D%0A%0D%0Aولكم جزيل الشكر والتقدير.`}
-                          onClick={(e) => {
-                            try {
-                              navigator.clipboard.writeText(getEncryptedRequestCode(getOrCreateDeviceSeed()));
-                              showToast('تم نسخ رمز طلب التفعيل الخاص بك وجاري فتح تطبيق البريد الإلكتروني لإرساله للمطور 📧', 'success');
-                            } catch (err) {
-                              console.warn('Clipboard write failed:', err);
-                            }
-                            // Programmatic fallback redirect to be extremely reliable inside iframes
-                            const mailtoUrl = `mailto:abuosid773@gmail.com?subject=طلب تفعيل تطبيق جامع الفوائد عبر الرمز المشفر&body=السلام عليكم ورحمة الله وبركاته،%0D%0A%0D%0Aأرجو منكم تزويدي بمفتاح التفعيل لتطبيق (جامع الفوائد).%0D%0A%0D%0Aالرمز المشفر المخصص لجهازي هو: ${getEncryptedRequestCode(getOrCreateDeviceSeed())}%0D%0A%0D%0Aولكم جزيل الشكر والتقدير.`;
-                            window.location.href = mailtoUrl;
-                          }}
-                          className="w-full py-3 px-4 bg-brand-cream hover:bg-brand-cream/80 border border-brand-gold/20 text-brand-emerald-dark font-black text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
-                        >
-                          <Mail className="w-4 h-4 text-brand-gold" />
-                          <span>طلب رمز التفعيل الخاص بجهازك 📧</span>
-                        </a>
-                        <span className="text-[9px] text-zinc-400 block">
-                          (الرمز المشفر التلقائي لجهازك: <span className="font-mono font-bold select-all text-zinc-600 bg-zinc-100 px-1.5 py-0.5 rounded">{getEncryptedRequestCode(getOrCreateDeviceSeed())}</span>)
-                        </span>
-                      </div>
-
-                      {/* Divider */}
-                      <div className="flex items-center my-2 text-[10px] text-zinc-400">
-                        <div className="flex-1 border-t border-zinc-200"></div>
-                        <span className="px-2 font-bold font-sans">ثم</span>
-                        <div className="flex-1 border-t border-zinc-200"></div>
-                      </div>
-
-                      {/* Step 2: Input received code */}
-                      <div className="space-y-1.5">
-                        <label className="block text-[10px] font-bold text-zinc-600 text-right">أدخل كود التفعيل المستلم من المطور:</label>
-                        <input
-                          type="text"
-                          value={offlineActivationKeyInput}
-                          onChange={(e) => setOfflineActivationKeyInput(e.target.value)}
-                          placeholder="مثال: ACT-XXXX-XXXX-..."
-                          className="w-full text-center text-xs p-3 rounded-xl border border-zinc-300 bg-white focus:outline-none focus:ring-1 focus:ring-brand-gold text-zinc-850 font-mono font-bold tracking-wide placeholder-zinc-400 uppercase"
-                        />
-                      </div>
-
-                      {/* Step 3: Activate Button */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const trimmed = offlineActivationKeyInput.trim().toUpperCase();
-                          if (!trimmed) {
-                            showToast('يرجى إدخال كود التفعيل المستلم أولاً.', 'warning');
-                            return;
-                          }
-
-                          const seed = getOrCreateDeviceSeed();
-                          const expectedCode = deriveActivationCode(seed);
-
-                          if (trimmed === expectedCode || trimmed === 'ABU-OSID-VIP-7777' || trimmed === 'ABU-OSID-GOLD-PRO-9999') {
-                            setIsActivated(true);
-                            localStorage.setItem('abuosid_app_activated', 'true');
-                            localStorage.setItem('abuosid_activation_key', trimmed);
-                            showToast('تم التحقق والتفعيل الفوري بنجاح أوفلاين! تم فتح كافة الميزات مدى الحياة. 🎉✨🏆', 'success');
-                            setOfflineActivationKeyInput('');
-                          } else {
-                            showToast('كود التفعيل المدخل غير صحيح لهذا الجهاز. يرجى التحقق من نقله بشكل صحيح.', 'warning');
-                          }
-                        }}
-                        className="w-full py-3 bg-brand-emerald hover:bg-brand-emerald-dark text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <ShieldCheck className="w-4 h-4" />
-                        <span>تنشيط الرمز 🛡️</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  </div>
-              )}
-            </div>
-
-            {/* Submit Export Button with Trial Check */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-brand-gold/10">
-              <div className="text-[10px] text-zinc-500 text-right">
-                {!isActivated && !freePdfUsed && (
-                  <span className="text-brand-emerald-dark font-bold">
-                    {freePdfCount === 0 
-                      ? '✨ لديك محاولتان مجانيتان. سيتم استهلاك المحاولة الأولى عند التحميل.' 
-                      : '✨ لديك محاولة واحدة متبقية. سيتم استهلاكها عند هذا التحميل.'}
+                    <span className="text-rose-600 font-bold flex items-center gap-1">
+                      ❌ انتهت المحاولتان التجريبيتان المجانيتان. يرجى تفعيل النسخة الذهبية للمتابعة والطباعة المفتوحة.
+                    </span>
+                  )
+                ) : (
+                  <span className="text-emerald-700 font-bold flex items-center gap-1">
+                    🟢 التصدير نشط وغير محدود مدى الحياة بمختلف التنسيقات الفاخرة.
                   </span>
-                )}
-                {!isActivated && freePdfUsed && (
-                  <span className="text-rose-600 font-bold">❌ انتهت المحاولات المجانية (مرتان). يرجى التفعيل للتحميل.</span>
-                )}
-                {isActivated && (
-                  <span className="text-emerald-700 font-bold">🟢 التصدير نشط وغير محدود مدى الحياة.</span>
                 )}
               </div>
 
@@ -1455,7 +1449,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   }
 
                   if (!isActivated && freePdfUsed) {
-                    showToast('عذراً، لقد استنفدت محاولتيك المجانيتين. يرجى تفعيل رخصة التصدير للاستخدام اللامحدود. 🔒', 'warning');
+                    showToast('عذراً، لقد استنفدت محاولتيك المجانيتين للطباعة. يرجى تفعيل رخصة التصدير للاستخدام اللامحدود والطباعة المفتوحة. 🔒', 'warning');
                     if (onShowPremiumPromo) onShowPremiumPromo();
                     return;
                   }
@@ -1463,15 +1457,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   // Perform PDF Generation
                   exportBenefitsToPDF(benefits, pdfStyle, pdfBookTitle, pdfAuthorName, settings.programmerEmail, includeCover, pdfCategorySelect, pdfTheme);
                   
-                  if (!isActivated && !freePdfUsed) {
-                    // Consume the free trial
+                  if (!isActivated) {
                     const newCount = freePdfCount + 1;
                     localStorage.setItem('abuosid_free_pdf_count', String(newCount));
-                    localStorage.setItem('abuosid_free_pdf_used', newCount >= 2 ? 'true' : 'false');
                     setFreePdfCount(newCount);
                     
                     if (newCount >= 2) {
-                      showToast('تم تصدير ملف الـ PDF بنجاح واستهلاك المحاولة المجانية الثانية والأخيرة. للتصدير مجدداً يرجى التفعيل. 🎉', 'success');
+                      showToast('تم تصدير ملف الـ PDF بنجاح واستهلاك المحاولة المجانية الثانية والأخيرة. للطباعة مجدداً يرجى تنشيط النسخة المميزة. 🎉', 'success');
                     } else {
                       showToast('تم تصدير ملف الـ PDF بنجاح واستهلاك المحاولة المجانية الأولى. متبقي لك محاولة مجانية واحدة أخرى. 🎉', 'success');
                     }
@@ -1479,12 +1471,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     showToast('جاري تحضير ملف PDF وتوليده بنجاح للطباعة... 📥', 'success');
                   }
                 }}
-                disabled={!isActivated && freePdfUsed}
-                className={`px-6 py-3 text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto hover:scale-[1.01] active:scale-[0.99] ${
-                  (!isActivated && freePdfUsed)
-                    ? 'bg-zinc-300 text-zinc-500 cursor-not-allowed shadow-none'
-                    : 'bg-brand-gold hover:bg-brand-gold-light text-white'
-                }`}
+                className="px-6 py-3 text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto hover:scale-[1.01] active:scale-[0.99] bg-brand-gold hover:bg-brand-gold-light text-white"
               >
                 <Download className="w-4 h-4 text-white" />
                 <span>تحميل وتوليد الكتاب الفاخر (PDF) 📗</span>
@@ -1659,17 +1646,19 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
 
               {!isActivated ? (
-                <div className="bg-zinc-100/70 rounded-xl p-4 border border-zinc-200/50 flex flex-col items-center justify-center text-center space-y-2 mt-4">
+                <div 
+                  onClick={() => {
+                    showToast('النسخ الاحتياطي التلقائي ميزة خاصة بالنسخة الذهبية المميزة 👑', 'warning');
+                    const section = document.getElementById('activation-section');
+                    if (section) section.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="bg-zinc-100/70 hover:bg-zinc-100/90 rounded-xl p-4 border border-zinc-200/50 flex flex-col items-center justify-center text-center space-y-2 mt-4 cursor-pointer transition-all"
+                >
                   <p className="text-[11px] text-zinc-500 font-bold leading-relaxed">
                     النسخ الاحتياطي التلقائي (المحلي والسحابي) هو ميزة حصرية خاصة بأصحاب النسخة الذهبية المميزة 👑
                   </p>
                   <button
                     type="button"
-                    onClick={() => {
-                      showToast('النسخ الاحتياطي التلقائي ميزة خاصة بالنسخة الذهبية المميزة 👑', 'warning');
-                      const section = document.getElementById('activation-section');
-                      if (section) section.scrollIntoView({ behavior: 'smooth' });
-                    }}
                     className="px-4 py-2 bg-brand-gold hover:bg-brand-gold-light text-white text-[11px] font-bold rounded-xl flex items-center gap-1 cursor-pointer transition-all shadow-sm"
                   >
                     <Lock className="w-3.5 h-3.5" />
