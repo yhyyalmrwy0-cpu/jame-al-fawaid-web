@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { BookOpen, HelpCircle, FolderSync, PlusCircle, Search, Heart, SlidersHorizontal, Grid, Star, Sparkles, Layers, Eye, ArrowUp, X } from 'lucide-react';
+import { BookOpen, HelpCircle, FolderSync, PlusCircle, Search, Heart, SlidersHorizontal, Grid, Star, Sparkles, Layers, Eye, ArrowUp, X, Printer } from 'lucide-react';
 
 // Import Types
 import { Benefit, ScientificQuery, AppSettings, CATEGORIES, CategoryType } from './types';
@@ -92,7 +92,7 @@ const STARTER_QUERIES: ScientificQuery[] = [
 
 export default function App() {
   // Navigation tabs state
-  const [activeTab, setActiveTab] = useState<'home' | 'add' | 'queries' | 'settings'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'add' | 'queries' | 'settings' | 'print'>('home');
 
   // Back to top button visibility state
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -1073,6 +1073,34 @@ export default function App() {
                 isControlPanelVisible={isControlPanelVisible}
                 onUnlockControlPanel={handleToggleControlPanel}
                 onShowWelcome={() => setShowWelcome(true)}
+                activeView="settings"
+              />
+            </motion.div>
+          )}
+
+          {activeTab === 'print' && (
+            <motion.div
+              key="print"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.3 }}
+            >
+              <SettingsPanel
+                settings={settings}
+                benefits={benefits}
+                queries={queries}
+                onUpdateSettings={handleUpdateSettings}
+                onImportData={handleImportData}
+                onRestoreBackup={handleRestoreBackup}
+                triggerAutoBackup={triggerAutoBackup}
+                triggerTestNotification={triggerTestNotification}
+                showToast={showToast}
+                onShowPremiumPromo={() => setShowPremiumPromo(true)}
+                isControlPanelVisible={isControlPanelVisible}
+                onUnlockControlPanel={handleToggleControlPanel}
+                onShowWelcome={() => setShowWelcome(true)}
+                activeView="print"
               />
             </motion.div>
           )}
@@ -1097,7 +1125,7 @@ export default function App() {
           }`}>
             <BookOpen className="w-5.5 h-5.5" />
           </div>
-          <span className="text-[10px] font-bold font-sans">الفوائد العلمية</span>
+          <span className="text-[10px] font-bold font-sans">الفوائد</span>
         </button>
 
         {/* Navigation Add Benefit */}
@@ -1136,6 +1164,24 @@ export default function App() {
           <span className="text-[10px] font-bold font-sans">الاستشكالات</span>
         </button>
 
+        {/* Navigation Printing */}
+        <button
+          onClick={() => {
+            setEditingBenefit(null);
+            setActiveTab('print');
+          }}
+          className={`flex flex-col items-center justify-center gap-1.5 w-16 py-2 transition-all cursor-pointer ${
+            activeTab === 'print' ? 'text-brand-emerald scale-105' : 'text-zinc-400 hover:text-zinc-600'
+          }`}
+        >
+          <div className={`p-1.5 rounded-xl transition-all ${
+            activeTab === 'print' ? 'bg-brand-cream text-brand-emerald-dark' : ''
+          }`}>
+            <Printer className="w-5.5 h-5.5" />
+          </div>
+          <span className="text-[10px] font-bold font-sans">الطباعة</span>
+        </button>
+
         {/* Navigation Settings */}
         <button
           onClick={() => {
@@ -1151,7 +1197,7 @@ export default function App() {
           }`}>
             <FolderSync className="w-5.5 h-5.5" />
           </div>
-          <span className="text-[10px] font-bold font-sans">الحفظ والطباعة</span>
+          <span className="text-[10px] font-bold font-sans">الإعدادات</span>
         </button>
       </nav>
 

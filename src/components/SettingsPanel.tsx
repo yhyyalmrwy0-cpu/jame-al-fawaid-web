@@ -77,6 +77,7 @@ interface SettingsPanelProps {
   isControlPanelVisible?: boolean;
   onUnlockControlPanel?: () => void;
   onShowWelcome?: () => void;
+  activeView?: 'settings' | 'print';
 }
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -93,6 +94,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   isControlPanelVisible,
   onUnlockControlPanel,
   onShowWelcome,
+  activeView = 'settings',
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingBackupAfterLoginRef = useRef<boolean>(false);
@@ -274,7 +276,19 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [showAdminSection, setShowAdminSection] = useState(false);
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-  const [adminKeysList, setAdminKeysList] = useState<Record<string, { used: boolean, activatedAt: number | null, deviceId: string | null, note?: string, createdAt?: number }>>({});
+  const [adminKeysList, setAdminKeysList] = useState<Record<string, { used: boolean, activatedAt: number | null, deviceId: string | null, note?: string, createdAt?: number }>>(() => {
+    try {
+      const cached = localStorage.getItem('abuosid_admin_keys_list');
+      return cached ? JSON.parse(cached) : {};
+    } catch (e) {
+      return {};
+    }
+  });
+
+  React.useEffect(() => {
+    localStorage.setItem('abuosid_admin_keys_list', JSON.stringify(adminKeysList));
+  }, [adminKeysList]);
+
   const [adminStats, setAdminStats] = useState<{
     totalVisitors: number;
     totalSubscribers: number;
@@ -298,6 +312,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [adminDecryptInput, setAdminDecryptInput] = useState('');
   const [adminGeneratedOfflineCode, setAdminGeneratedOfflineCode] = useState('');
   const [offlineActivationKeyInput, setOfflineActivationKeyInput] = useState('');
+  const [offlineUserNameInput, setOfflineUserNameInput] = useState('');
 
   // Password changing states
   const [newAdminPassword, setNewAdminPassword] = useState('');
@@ -471,7 +486,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
     if (isLocalPasswordCorrect) {
       setIsAdminLoggedIn(true);
-      showToast('مرحباً بك يا شيخ في لوحة التحكم وتوليد الرموز بنجاح! (تم تسجيل الدخول محلياً) 🔑', 'success');
+      showToast('مرحباً بك في لوحة التحكم وتوليد الرموز بنجاح! (تم تسجيل الدخول محلياً) 🔑', 'success');
       
       // Attempt background online sync, but don't fail or show warning if offline
       try {
@@ -519,7 +534,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             localStorage.setItem('abuosid_admin_stats', JSON.stringify(data.stats));
           }
           localStorage.setItem('abuosid_local_admin_password', password);
-          showToast('مرحباً بك يا شيخ في لوحة التحكم! تم التحقق وتحديث كلمة المرور المحلية. 🔑', 'success');
+          showToast('مرحباً بك في لوحة التحكم! تم التحقق وتحديث كلمة المرور المحلية. 🔑', 'success');
           return;
         } else {
           showToast(data.message || 'كلمة المرور غير صحيحة!', 'warning');
@@ -744,7 +759,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       setIsActivated(true);
       localStorage.setItem('abuosid_app_activated', 'true');
       localStorage.setItem('abuosid_activation_key', normalizedKey);
-      showToast('تم التحقق والتفعيل الفوري بنجاح باستخدام كود الشيخ المطور الرئيسي! تم فتح جميع الميزات والنسخ السحابي والطباعة اللامحدودة مدى الحياة. 🏆✨', 'success');
+      showToast('تم التحقق والتفعيل الفوري بنجاح باستخدام كود المطور الرئيسي! تم فتح جميع الميزات والنسخ السحابي والطباعة اللامحدودة مدى الحياة. 🏆✨', 'success');
       return;
     }
 
@@ -886,13 +901,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     <div className="space-y-6 text-right font-sans">
       
       {/* 1. Schedulers & Notifications */}
-      <div className="bg-white rounded-2xl border border-zinc-200 p-5 custom-shadow">
-        <h3 className="text-base font-bold text-brand-emerald-dark border-b border-zinc-100 pb-3 mb-4 flex items-center gap-2">
-          <Bell className="w-5 h-5 text-brand-gold" />
-          نظام التنبيهات والإشعارات الخارجية
-        </h3>
+      {activeView !== 'print' &&
+        <div className="bg-white rounded-2xl border border-zinc-200 p-5 custom-shadow">
+          <h3 className="text-base font-bold text-brand-emerald-dark border-b border-zinc-100 pb-3 mb-4 flex items-center gap-2">
+            <Bell className="w-5 h-5 text-brand-gold" />
+            نظام التنبيهات والإشعارات الخارجية
+          </h3>
 
-        <div className="space-y-4">
+          <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <p className="text-sm font-bold text-zinc-800">تكرار إرسال التنبيهات الدورية التلقائية</p>
@@ -1001,10 +1017,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               تجربة إشعار التذكير 🔔
             </button>
           </div>
+        </div>
+      </div>
+    }
 
-          {/* PDF Export Section */}
-          <div className="col-span-1 md:col-span-2 p-5 rounded-2xl border border-brand-gold/30 bg-brand-cream/10 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-brand-gold/10 pb-3 mb-1">
+      {/* PDF Export Section */}
+      {activeView === 'print' &&
+        <div className="bg-white rounded-2xl border border-zinc-200 p-5 custom-shadow space-y-4 border-t-4 border-t-brand-gold">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-brand-gold/10 pb-3 mb-1">
               <div className="space-y-1">
                 <span className="font-bold text-zinc-800 text-sm flex items-center gap-2">
                   <span className="p-1.5 bg-brand-gold/15 text-brand-gold-dark rounded-lg text-base">📄</span>
@@ -1324,7 +1344,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         تنشيط النسخة المدفوعة (أوفلاين بالكامل):
                       </h4>
                       <p className="text-[10px] text-zinc-500 leading-relaxed mt-0.5">
-                        قم بإنشاء رمز تفعيل مخصص لجهازك وإرساله بالبريد الإلكتروني للشيخ المطور لتستلم كود التنشيط الخاص بك مباشرة.
+                        قم بإنشاء رمز تفعيل مخصص لجهازك وإرساله بالبريد الإلكتروني للمطور لتستلم كود التنشيط الخاص بك مباشرة.
                       </p>
                     </div>
 
@@ -1332,16 +1352,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       {/* Step 1: Request Activation Code Button */}
                       <div className="text-center space-y-1">
                         <a
-                          href={`mailto:abuosid773@gmail.com?subject=طلب تفعيل تطبيق جامع الفوائد عبر الرمز المشفر&body=السلام عليكم ورحمة الله وبركاته،%0D%0A%0D%0Aأرجو من فضيلتكم تزويدي بمفتاح التفعيل لتطبيق (جامع الفوائد).%0D%0A%0D%0Aالرمز المشفر المخصص لجهازي هو: ${getEncryptedRequestCode(getOrCreateDeviceSeed())}%0D%0A%0D%0Aولكم جزيل الشكر والتقدير.`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={() => {
+                          href={`mailto:abuosid773@gmail.com?subject=طلب تفعيل تطبيق جامع الفوائد عبر الرمز المشفر&body=السلام عليكم ورحمة الله وبركاته،%0D%0A%0D%0Aأرجو منكم تزويدي بمفتاح التفعيل لتطبيق (جامع الفوائد).%0D%0A%0D%0Aالرمز المشفر المخصص لجهازي هو: ${getEncryptedRequestCode(getOrCreateDeviceSeed())}%0D%0A%0D%0Aولكم جزيل الشكر والتقدير.`}
+                          onClick={(e) => {
                             try {
                               navigator.clipboard.writeText(getEncryptedRequestCode(getOrCreateDeviceSeed()));
-                              showToast('تم نسخ رمز طلب التفعيل الخاص بك وجاري فتح تطبيق البريد الإلكتروني لإرساله للشيخ 📧', 'success');
-                            } catch (e) {
-                              console.warn('Clipboard write failed:', e);
+                              showToast('تم نسخ رمز طلب التفعيل الخاص بك وجاري فتح تطبيق البريد الإلكتروني لإرساله للمطور 📧', 'success');
+                            } catch (err) {
+                              console.warn('Clipboard write failed:', err);
                             }
+                            // Programmatic fallback redirect to be extremely reliable inside iframes
+                            const mailtoUrl = `mailto:abuosid773@gmail.com?subject=طلب تفعيل تطبيق جامع الفوائد عبر الرمز المشفر&body=السلام عليكم ورحمة الله وبركاته،%0D%0A%0D%0Aأرجو منكم تزويدي بمفتاح التفعيل لتطبيق (جامع الفوائد).%0D%0A%0D%0Aالرمز المشفر المخصص لجهازي هو: ${getEncryptedRequestCode(getOrCreateDeviceSeed())}%0D%0A%0D%0Aولكم جزيل الشكر والتقدير.`;
+                            window.location.href = mailtoUrl;
                           }}
                           className="w-full py-3 px-4 bg-brand-cream hover:bg-brand-cream/80 border border-brand-gold/20 text-brand-emerald-dark font-black text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
                         >
@@ -1470,9 +1491,19 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </button>
             </div>
           </div>
+        }
 
-          {/* Responsive Backup Options Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+      {/* 2. Backup & Restore Section */}
+      {activeView !== 'print' &&
+        <div className="bg-white rounded-2xl border border-zinc-200 p-5 custom-shadow">
+          <h3 className="text-base font-bold text-brand-emerald-dark border-b border-zinc-100 pb-3 mb-4 flex items-center gap-2">
+            <Cloud className="w-5 h-5 text-brand-gold" />
+            النسخ الاحتياطي ومزامنة البيانات
+          </h3>
+
+          <div className="space-y-4">
+            {/* Responsive Backup Options Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
             {/* Local Phone Backup */}
             <div className="p-4 rounded-xl border border-zinc-100 bg-zinc-50/40 flex flex-col justify-between">
               <div className="space-y-1">
@@ -1928,9 +1959,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           )}
         </div>
       </div>
+    }
 
       {/* 3. Welcome Screen & Help Section */}
-      <div className="bg-white rounded-2xl border border-zinc-200 p-5 custom-shadow">
+      {activeView !== 'print' &&
+        <>
+          <div className="bg-white rounded-2xl border border-zinc-200 p-5 custom-shadow">
         <h3 className="text-base font-bold text-brand-emerald-dark border-b border-zinc-100 pb-3 mb-4 flex items-center gap-2">
           <HelpCircle className="w-5 h-5 text-brand-gold" />
           الشاشة الترحيبية ومكونات التطبيق 📚✨
@@ -2049,7 +2083,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <div className="space-y-1 text-right">
               <h3 className="text-base font-bold text-brand-emerald-dark flex items-center gap-2">
                 <span className="p-1.5 bg-brand-gold/10 text-brand-gold-dark rounded-lg text-base">🔑</span>
-                لوحة تحكم المشرف وتوليد الرموز (خاصة بالشيخ المطور)
+                لوحة تحكم المشرف وتوليد الرموز (خاصة بالمطور)
               </h3>
               <p className="text-xs text-zinc-500 leading-relaxed">
                 خاص بمشرف ومطور البرنامج لتوليد وحذف رموز التفعيل المخصصة لشخص واحد ومتابعة الأجهزة النشطة.
@@ -2233,42 +2267,91 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         </span>
                       </div>
 
-                      <div className="space-y-2">
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <input
-                            type="text"
-                            value={adminDecryptInput}
-                            onChange={(e) => setAdminDecryptInput(e.target.value)}
-                            placeholder="مثال: REQ-S6M1D4K0"
-                            className="flex-1 text-xs p-2.5 rounded-lg border border-zinc-300 bg-white focus:outline-none focus:ring-1 focus:ring-brand-gold text-zinc-800 font-mono font-bold tracking-wide"
-                          />
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="block text-[10px] text-zinc-500 font-bold">الرمز المشفر (REQ-...):</label>
+                            <input
+                              type="text"
+                              value={adminDecryptInput}
+                              onChange={(e) => setAdminDecryptInput(e.target.value)}
+                              placeholder="مثال: REQ-S6M1D4K0"
+                              className="w-full text-xs p-2.5 rounded-lg border border-zinc-300 bg-white focus:outline-none focus:ring-1 focus:ring-brand-gold text-zinc-800 font-mono font-bold tracking-wide"
+                            />
+                          </div>
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const cleaned = adminDecryptInput.trim().toUpperCase();
-                              if (!cleaned) {
-                                showToast('يرجى إدخال الرمز المشفر أولاً.', 'warning');
+                          <div className="space-y-1">
+                            <label className="block text-[10px] text-zinc-500 font-bold">اسم المستفيد لتسجيله وتوثيقه:</label>
+                            <input
+                              type="text"
+                              value={offlineUserNameInput}
+                              onChange={(e) => setOfflineUserNameInput(e.target.value)}
+                              placeholder="مثال: صالح الفوزان أو طالب العلم أحمد..."
+                              className="w-full text-xs p-2.5 rounded-lg border border-zinc-300 bg-white focus:outline-none focus:ring-1 focus:ring-brand-gold text-zinc-800 font-bold"
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const cleaned = adminDecryptInput.trim().toUpperCase();
+                            const userName = offlineUserNameInput.trim() || 'مستخدم غير معروف (أوفلاين)';
+                            if (!cleaned) {
+                              showToast('يرجى إدخال الرمز المشفر أولاً.', 'warning');
+                              return;
+                            }
+                            try {
+                              const seed = decryptRequestCode(cleaned);
+                              if (!seed || seed.length < 4) {
+                                showToast('الرمز المشفر غير صالح أو غير مكتمل.', 'warning');
                                 return;
                               }
-                              try {
-                                const seed = decryptRequestCode(cleaned);
-                                if (!seed || seed.length < 4) {
-                                  showToast('الرمز المشفر غير صالح أو غير مكتمل.', 'warning');
-                                  return;
-                                }
-                                const code = deriveActivationCode(seed);
-                                setAdminGeneratedOfflineCode(code);
-                                showToast('تم فك التشفير وتوليد كود التفعيل بنجاح! 🎉', 'success');
-                              } catch (err) {
-                                showToast('حدث خطأ أثناء معالجة الرمز المشفر.', 'warning');
-                              }
-                            }}
-                            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
-                          >
-                            <span>تحليل وتوليد الكود 🛡️</span>
-                          </button>
-                        </div>
+                              const code = deriveActivationCode(seed);
+                              setAdminGeneratedOfflineCode(code);
+
+                              // Save this key in adminKeysList & update statistics!
+                              setAdminKeysList(prev => {
+                                const updated = { ...prev };
+                                updated[code] = {
+                                  used: true,
+                                  activatedAt: Date.now(),
+                                  deviceId: seed,
+                                  note: userName,
+                                  createdAt: Date.now()
+                                };
+                                return updated;
+                              });
+
+                              // Update active count & total count in adminStats
+                              setAdminStats(prev => {
+                                const currentStats = prev || {
+                                  totalVisitors: 0,
+                                  totalSubscribers: 0,
+                                  totalFreeUsers: 0,
+                                  totalKeys: 0,
+                                  usedKeys: 0,
+                                  freeKeys: 0
+                                };
+                                const updatedStats = {
+                                  ...currentStats,
+                                  totalKeys: Math.max(currentStats.totalKeys + 1, Object.keys(adminKeysList).length + 1),
+                                  usedKeys: Math.max(currentStats.usedKeys + 1, (Object.values(adminKeysList) as any[]).filter(k => k.used).length + 1),
+                                  totalSubscribers: Math.max(currentStats.totalSubscribers + 1, (Object.values(adminKeysList) as any[]).filter(k => k.used).length + 1)
+                                };
+                                localStorage.setItem('abuosid_admin_stats', JSON.stringify(updatedStats));
+                                return updatedStats;
+                              });
+
+                              showToast(`تم فك التشفير وتوليد كود التفعيل وحفظه باسم (${userName}) بنجاح! 🎉`, 'success');
+                            } catch (err) {
+                              showToast('حدث خطأ أثناء معالجة الرمز المشفر.', 'warning');
+                            }
+                          }}
+                          className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                        >
+                          <span>تحليل وتوليد الكود وحفظه بالاسم 🛡️</span>
+                        </button>
 
                         {adminGeneratedOfflineCode && (
                           <div className="mt-3 p-3 bg-zinc-50 border border-zinc-200 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -2511,6 +2594,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </div>
         </div>
       </div>
+    </>
+  }
 
       {/* Custom Confirmation Modal */}
       {confirmModal && (
