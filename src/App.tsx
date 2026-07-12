@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { BookOpen, HelpCircle, FolderSync, PlusCircle, Search, Heart, SlidersHorizontal, Grid, Star, Sparkles, Layers, Eye, ArrowUp, X, Printer } from 'lucide-react';
+import { BookOpen, HelpCircle, FolderSync, PlusCircle, Search, Heart, SlidersHorizontal, Grid, Star, Sparkles, Layers, Eye, ArrowUp, X, Printer, Download, Smartphone } from 'lucide-react';
 
 // Import Types
 import { Benefit, ScientificQuery, AppSettings, CATEGORIES, CategoryType } from './types';
@@ -164,6 +164,53 @@ export default function App() {
       return true;
     }
   });
+
+  // PWA Install states
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState<boolean>(() => {
+    try {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
+      if (isStandalone) return false;
+      return localStorage.getItem('abuosid_install_banner_dismissed_v1') !== 'true';
+    } catch (e) {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
+      if (!isStandalone) {
+        setShowInstallBanner(true);
+      }
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      try {
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`User response to install prompt: ${outcome}`);
+        if (outcome === 'accepted') {
+          setShowInstallBanner(false);
+        }
+      } catch (err) {
+        console.error('Error in PWA install:', err);
+      }
+      setDeferredPrompt(null);
+    } else {
+      showToast('لتثبيت تطبيق جامع الفوائد على جوالك: اضغط على زر "مشاركة" (Share) في متصفحك (Safari أو Chrome) ثم اختر "إضافة إلى الصفحة الرئيسية" (Add to Home Screen) 📱✨', 'info');
+    }
+  };
+
   const [sharingBenefit, setSharingBenefit] = useState<Benefit | null>(null);
   const [expandedBenefitId, setExpandedBenefitId] = useState<string | null>(null);
   const [isControlPanelVisible, setIsControlPanelVisible] = useState<boolean>(() => {
@@ -767,6 +814,53 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* PWA Install Banner */}
+      <AnimatePresence>
+        {showInstallBanner && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="bg-gradient-to-r from-brand-emerald-dark to-brand-emerald text-white shadow-lg border-b border-brand-gold/25 relative overflow-hidden z-30"
+          >
+            <div className="max-w-4xl mx-auto px-4 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-right">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/10 rounded-xl">
+                  <Smartphone className="w-5 h-5 text-brand-gold" />
+                </div>
+                <div className="space-y-0.5">
+                  <span className="font-bold text-xs sm:text-sm block text-brand-cream">تطبيق جامع الفوائد متاح الآن للتثبيت على جوالك!</span>
+                  <p className="text-[10px] sm:text-xs text-brand-cream/80 leading-relaxed">
+                    تصفح وقيد فوائدك العلمية والحديثية أوفلاين بالكامل 100% وبدون إنترنت كأنه تطبيق جوال أصيل.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  onClick={handleInstallClick}
+                  className="bg-brand-gold hover:bg-brand-gold-light text-white text-xs font-black px-4 py-2.5 rounded-lg transition-all shadow-md flex items-center gap-1.5 cursor-pointer w-full sm:w-auto justify-center"
+                >
+                  <Download className="w-3.5 h-3.5 text-white" />
+                  <span>تثبيت تطبيق جامع الفوائد على الجوال</span>
+                </button>
+                <button
+                  onClick={() => {
+                    try {
+                      localStorage.setItem('abuosid_install_banner_dismissed_v1', 'true');
+                    } catch (e) {}
+                    setShowInstallBanner(false);
+                  }}
+                  className="text-white hover:text-zinc-200 text-xs px-2.5 py-2 hover:bg-white/10 rounded-lg cursor-pointer transition-all whitespace-nowrap"
+                >
+                  تخطي
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Primary Layout container */}
       <main className="w-full max-w-4xl mx-auto px-4 pt-6 flex-1 space-y-6">
         
@@ -1074,6 +1168,7 @@ export default function App() {
                 onUnlockControlPanel={handleToggleControlPanel}
                 onShowWelcome={() => setShowWelcome(true)}
                 activeView="settings"
+                onInstallApp={handleInstallClick}
               />
             </motion.div>
           )}
@@ -1101,6 +1196,7 @@ export default function App() {
                 onUnlockControlPanel={handleToggleControlPanel}
                 onShowWelcome={() => setShowWelcome(true)}
                 activeView="print"
+                onInstallApp={handleInstallClick}
               />
             </motion.div>
           )}

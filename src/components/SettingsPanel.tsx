@@ -78,6 +78,7 @@ interface SettingsPanelProps {
   onUnlockControlPanel?: () => void;
   onShowWelcome?: () => void;
   activeView?: 'settings' | 'print';
+  onInstallApp?: () => void;
 }
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -95,6 +96,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onUnlockControlPanel,
   onShowWelcome,
   activeView = 'settings',
+  onInstallApp,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingBackupAfterLoginRef = useRef<boolean>(false);
@@ -1017,6 +1019,31 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* 📱 PWA Install Promotion Box (Sleek Arabic design) */}
+      {activeView !== 'print' && (
+        <div className="bg-gradient-to-br from-brand-emerald-dark to-brand-emerald text-white rounded-2xl p-5 shadow-lg relative overflow-hidden border border-brand-gold/20 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="absolute top-0 right-0 opacity-10 pointer-events-none transform translate-x-4 -translate-y-4">
+            <span className="text-[120px] font-sans font-black select-none">📱</span>
+          </div>
+          <div className="space-y-1.5 text-right z-10 flex-1">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-brand-gold text-white text-[10px] font-bold">
+              ✨ متاح الآن للتثبيت الفوري
+            </span>
+            <h3 className="text-base font-black text-brand-cream">تثبيت تطبيق جامع الفوائد على الجوال</h3>
+            <p className="text-xs text-brand-cream/90 leading-relaxed max-w-xl">
+              يمكنك إضافة اختصار للتطبيق على الشاشة الرئيسية لجوالك وتصفح وقيد الفوائد العلمية والحديثية أوفلاين بالكامل 100% دون الحاجة لسرعة الإنترنت وبشكل أسرع وأسهل!
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onInstallApp}
+            className="w-full md:w-auto px-5 py-3.5 bg-brand-gold hover:bg-brand-gold-light text-white font-black text-xs rounded-xl shadow-md transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 border border-brand-gold-light z-10 whitespace-nowrap"
+          >
+            <span>📱 تثبيت تطبيق جامع الفوائد على الجوال</span>
+          </button>
         </div>
       )}
 
