@@ -194,20 +194,27 @@ export default function App() {
   }, []);
 
   const handleInstallClick = async () => {
+    // Show user a message that the APK download has started
+    showToast('جاري توجيهك لتحميل ملف تطبيق الأندرويد (APK) من Google Drive... 📱✨', 'success');
+    
+    // Open Google Drive direct download URL in a new window/tab to trigger download
+    window.open('https://drive.google.com/uc?export=download&id=1443vaP5QTT8rt5PSVviq0U1-lEhG6yB9', '_blank');
+
+    // After starting the download, if native browser PWA prompt is supported, offer it too!
     if (deferredPrompt) {
-      deferredPrompt.prompt();
-      try {
-        const { outcome } = await deferredPrompt.userChoice;
-        console.log(`User response to install prompt: ${outcome}`);
-        if (outcome === 'accepted') {
-          setShowInstallBanner(false);
+      setTimeout(async () => {
+        try {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          console.log(`User response to PWA install prompt: ${outcome}`);
+          if (outcome === 'accepted') {
+            setShowInstallBanner(false);
+          }
+        } catch (err) {
+          console.error('Error in PWA install:', err);
         }
-      } catch (err) {
-        console.error('Error in PWA install:', err);
-      }
-      setDeferredPrompt(null);
-    } else {
-      showToast('لتثبيت تطبيق جامع الفوائد على جوالك: اضغط على زر "مشاركة" (Share) في متصفحك (Safari أو Chrome) ثم اختر "إضافة إلى الصفحة الرئيسية" (Add to Home Screen) 📱✨', 'info');
+        setDeferredPrompt(null);
+      }, 2500);
     }
   };
 
@@ -830,9 +837,9 @@ export default function App() {
                   <Smartphone className="w-5 h-5 text-brand-gold" />
                 </div>
                 <div className="space-y-0.5">
-                  <span className="font-bold text-xs sm:text-sm block text-brand-cream">تطبيق جامع الفوائد متاح الآن للتثبيت على جوالك!</span>
+                  <span className="font-bold text-xs sm:text-sm block text-brand-cream">تحميل وتثبيت تطبيق جامع الفوائد على جوالك!</span>
                   <p className="text-[10px] sm:text-xs text-brand-cream/80 leading-relaxed">
-                    تصفح وقيد فوائدك العلمية والحديثية أوفلاين بالكامل 100% وبدون إنترنت كأنه تطبيق جوال أصيل.
+                    حمل ملف الأندرويد (APK) المباشر لتصفح وقيد فوائدك العلمية والحديثية أوفلاين بالكامل 100% وبدون إنترنت كأنه تطبيق أصيل.
                   </p>
                 </div>
               </div>
@@ -842,7 +849,7 @@ export default function App() {
                   className="bg-brand-gold hover:bg-brand-gold-light text-white text-xs font-black px-4 py-2.5 rounded-lg transition-all shadow-md flex items-center gap-1.5 cursor-pointer w-full sm:w-auto justify-center"
                 >
                   <Download className="w-3.5 h-3.5 text-white" />
-                  <span>تثبيت تطبيق جامع الفوائد على الجوال</span>
+                  <span>تحميل تطبيق الجوال (APK)</span>
                 </button>
                 <button
                   onClick={() => {
