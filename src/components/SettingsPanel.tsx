@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Download, Upload, Cloud, RefreshCw, Bell, User, Mail, ShieldCheck, ExternalLink, HelpCircle, Check, AlertTriangle, Play, Smartphone, Copy, Key, Lock, Unlock } from 'lucide-react';
+import { Download, Upload, Cloud, RefreshCw, Bell, User, Mail, ShieldCheck, ExternalLink, HelpCircle, Check, AlertTriangle, Play, Smartphone, Copy, Key, Lock, Unlock, Trash2, FolderPlus, FolderSync, X } from 'lucide-react';
 import { AppSettings, Benefit, ScientificQuery, CATEGORIES } from '../types';
 import { exportBenefitsToPDF, formatToHijriAndGregorian } from '../utils';
 import { 
@@ -79,6 +79,9 @@ interface SettingsPanelProps {
   onShowWelcome?: () => void;
   activeView?: 'settings' | 'print';
   onInstallApp?: () => void;
+  categoriesList?: string[];
+  onAddCustomCategory?: (name: string) => boolean;
+  onDeleteCustomCategory?: (name: string) => void;
 }
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -97,6 +100,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onShowWelcome,
   activeView = 'settings',
   onInstallApp,
+  categoriesList = [...CATEGORIES],
+  onAddCustomCategory,
+  onDeleteCustomCategory,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingBackupAfterLoginRef = useRef<boolean>(false);
@@ -162,6 +168,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [lastDriveSync, setLastDriveSync] = useState<string | null>(null);
 
   const [copiedLink, setCopiedLink] = useState(false);
+  const [newCatNameSettings, setNewCatNameSettings] = useState('');
 
   // Custom PDF Export Options State
   const [pdfStyle, setPdfStyle] = useState<'grid' | 'book'>('grid');
@@ -2555,6 +2562,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </AnimatePresence>
         </div>
       )}
+
+
 
       {/* 4. Developer and App Information */}
       <div className="bg-gradient-to-l from-brand-emerald-dark to-brand-emerald rounded-2xl p-6 text-white border border-brand-gold/20 custom-shadow">

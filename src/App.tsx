@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { BookOpen, HelpCircle, FolderSync, PlusCircle, Search, Heart, SlidersHorizontal, Grid, Star, Sparkles, Layers, Eye, ArrowUp, X, Printer, Download, Smartphone } from 'lucide-react';
+import { BookOpen, HelpCircle, FolderSync, PlusCircle, Search, Heart, SlidersHorizontal, Grid, Star, Sparkles, Layers, Eye, ArrowUp, X, Printer, Download, Smartphone, Folder, FolderPlus, Trash2, FolderMinus } from 'lucide-react';
 
 // Import Types
 import { Benefit, ScientificQuery, AppSettings, CATEGORIES, CategoryType } from './types';
@@ -182,7 +182,8 @@ export default function App() {
       e.preventDefault();
       setDeferredPrompt(e);
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
-      if (!isStandalone) {
+      const dismissed = localStorage.getItem('abuosid_install_banner_dismissed_v1') === 'true';
+      if (!isStandalone && !dismissed) {
         setShowInstallBanner(true);
       }
     };
@@ -194,6 +195,12 @@ export default function App() {
   }, []);
 
   const handleInstallClick = async () => {
+    // Save to localStorage that the user has chosen to install (or dismissed the banner)
+    try {
+      localStorage.setItem('abuosid_install_banner_dismissed_v1', 'true');
+    } catch (e) {}
+    setShowInstallBanner(false);
+
     // Show user a message that the APK download has started
     showToast('جاري توجيهك لتحميل ملف تطبيق الأندرويد (APK) من Google Drive... 📱✨', 'success');
     
@@ -207,9 +214,6 @@ export default function App() {
           deferredPrompt.prompt();
           const { outcome } = await deferredPrompt.userChoice;
           console.log(`User response to PWA install prompt: ${outcome}`);
-          if (outcome === 'accepted') {
-            setShowInstallBanner(false);
-          }
         } catch (err) {
           console.error('Error in PWA install:', err);
         }
@@ -455,8 +459,74 @@ export default function App() {
 
   // UI state filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<CategoryType | 'الكل'>('الكل');
+  const [selectedCategory, setSelectedCategory] = useState<string>('الكل');
   const [onlyFavorites, setOnlyFavorites] = useState(false);
+
+  // Dynamic custom categories state
+  const [categories, setCategories] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('abuosid_custom_categories_list_v1');
+      return saved ? JSON.parse(saved) : [...CATEGORIES];
+    } catch (e) {
+      return [...CATEGORIES];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('abuosid_custom_categories_list_v1', JSON.stringify(categories));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [categories]);
+
+  const [isAllCategoriesExpanded, setIsAllCategoriesExpanded] = useState(false);
+  const [showCategoriesPopup, setShowCategoriesPopup] = useState(false);
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+
+  const handleAddCustomCategory = (name: string): boolean => {
+    const cleanName = name.trim();
+    if (!cleanName) {
+      showToast('يرجى إدخال اسم قسم صالح!', 'warning');
+      return false;
+    }
+    if (categories.some(cat => cat.toLowerCase() === cleanName.toLowerCase())) {
+      showToast('هذا القسم موجود بالفعل!', 'warning');
+      return false;
+    }
+    setCategories(prev => [...prev, cleanName]);
+    showToast(`تمت إضافة القسم الجديد "${cleanName}" بنجاح! 🎉`, 'success');
+    return true;
+  };
+
+  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
+
+  const handleDeleteCustomCategory = (name: string) => {
+    // Prevent deleting built-in categories
+    if (CATEGORIES.includes(name as any)) {
+      showToast('لا يمكن حذف الأقسام المدمجة الأساسية للتطبيق!', 'warning');
+      return;
+    }
+    
+    // Filter out from category list
+    setCategories(prev => prev.filter(cat => cat !== name));
+
+    // Move all benefits under this category to "علوم أخرى"
+    const countToMove = benefits.filter(b => b.category === name).length;
+    if (countToMove > 0) {
+      setBenefits(prev => prev.map(b => b.category === name ? { ...b, category: 'علوم أخرى' } : b));
+      showToast(`تم حذف القسم بنجاح، ونقل ${countToMove} من الفوائد إلى قسم "علوم أخرى" 📁✨`, 'success');
+    } else {
+      showToast(`تم حذف قسم "${name}" بنجاح! 🗑️`, 'success');
+    }
+
+    // Reset selected filter if it was the deleted one
+    if (selectedCategory === name) {
+      setSelectedCategory('الكل');
+    }
+    setCategoryToDelete(null);
+  };
 
   // Active Toast & Notification states
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'warning' } | null>(null);
@@ -922,102 +992,286 @@ export default function App() {
                         }}
                         className="mt-2 text-xs font-bold text-amber-950 hover:text-amber-800 underline flex items-center gap-1 transition-colors cursor-pointer"
                       >
-                        <span>انتقل إلى منصة الاستشكالات والبحث عن حلول ↗</span>
+                        <span>انتقل إلى منصة الاستشكالات والبحث عن حلول للمسائل العالقة ⟵</span>
                       </button>
                     </div>
                   </div>
-
-                  <button
-                    onClick={() => setIsDoubtBannerDismissed(true)}
-                    className="p-1 text-amber-600 hover:text-amber-800 hover:bg-amber-100/50 rounded-lg transition-all cursor-pointer"
-                    title="تجاهل التنبيه"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
                 </motion.div>
               )}
 
-              {/* Filtering Controls Panel */}
-              <div className="bg-white rounded-2xl border border-zinc-200 p-5 custom-shadow space-y-4">
-                {/* Favorites Filter & Reset Button */}
-                <div className="flex items-center justify-between gap-3 border-b border-zinc-100 pb-3">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-500">
-                    <SlidersHorizontal className="w-4 h-4 text-brand-gold" />
-                    <span>تصفح وتصفية الفوائد العلمية بحسب الفئة والمفضلة:</span>
+              {/* Elegant Category Selection Trigger Button */}
+              <div className="space-y-2 font-sans">
+                <label className="text-xs font-black text-zinc-500 flex items-center gap-1.5 justify-start text-right">
+                  <Folder className="w-4 h-4 text-brand-emerald-dark" />
+                  <span>تصفية واستعراض الفوائد والفرائد حسب القسم العلمي:</span>
+                </label>
+                
+                <button
+                  type="button"
+                  onClick={() => setShowCategoriesPopup(true)}
+                  className="w-full bg-brand-emerald-dark hover:bg-brand-emerald-light text-white py-3.5 px-5 rounded-2xl shadow-md border border-brand-emerald-dark/55 flex items-center justify-between font-sans transition-all duration-300 group cursor-pointer active:scale-[0.99]"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-white/10 rounded-xl group-hover:scale-105 transition-transform">
+                      <FolderSync className="w-5 h-5 text-brand-gold-light" />
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] block text-brand-cream/70 font-bold">القسم العلمي النشط الآن</span>
+                      <span className="text-sm sm:text-base font-black block text-white mt-0.5 leading-tight">
+                        {selectedCategory === 'الكل' ? 'جميع الفوائد والفرائد' : selectedCategory}
+                      </span>
+                    </div>
                   </div>
-
-                  <div className="flex gap-2 shrink-0">
-                    {/* Toggle favorites switch */}
-                    <button
-                      onClick={() => setOnlyFavorites(!onlyFavorites)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 border cursor-pointer ${
-                        onlyFavorites
-                          ? 'bg-red-50 text-red-600 border-red-200 shadow-sm'
-                          : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
-                      }`}
-                    >
-                      <Heart className={`w-3.5 h-3.5 ${onlyFavorites ? 'fill-red-500 text-red-500' : 'text-zinc-400'}`} />
-                      <span>المفضلة</span>
-                    </button>
-
-                    {/* Reset search filter */}
-                    {(searchQuery || selectedCategory !== 'الكل' || onlyFavorites) && (
-                      <button
-                        onClick={() => {
-                          setSearchQuery('');
-                          setSelectedCategory('الكل');
-                          setOnlyFavorites(false);
-                          showToast('تمت إعادة تهيئة فلاتر التصفح والمشاهدة.', 'info');
-                        }}
-                        className="px-2.5 py-1.5 bg-zinc-100 hover:bg-zinc-200 rounded-lg text-[11px] font-bold text-zinc-600 transition-all flex items-center gap-1 cursor-pointer"
-                        title="إعادة تعيين الكل"
-                      >
-                        إعادة تعيين
-                      </button>
-                    )}
+                  
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-black px-2.5 py-1 bg-white/10 rounded-full text-brand-cream border border-white/5 whitespace-nowrap">
+                      {selectedCategory === 'الكل' 
+                        ? `${benefits.length} فائدة` 
+                        : `${benefits.filter(b => b.category === selectedCategory).length} فائدة`
+                      }
+                    </span>
+                    {/* Elegant Gold Triangle Indicator */}
+                    <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center transition-transform group-hover:scale-105 border border-white/5 shrink-0">
+                      <span className="text-brand-gold-light text-[10px] select-none transform transition-transform group-hover:translate-y-0.5">
+                        ▼
+                      </span>
+                    </div>
                   </div>
-                </div>
-
-                {/* Category Selection Chips Carousel */}
-                <div className="space-y-2">
-                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1 bg-zinc-50/40 rounded-xl border border-zinc-100">
-                    <button
-                      onClick={() => setSelectedCategory('الكل')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                        selectedCategory === 'الكل'
-                          ? 'bg-brand-emerald text-white'
-                          : 'bg-white hover:bg-zinc-100 text-zinc-600 border border-zinc-200'
-                      }`}
-                    >
-                      الكل ({benefits.length})
-                    </button>
-
-                    {CATEGORIES.map(cat => {
-                      const count = benefits.filter(b => b.category === cat).length;
-                      if (count === 0) return null; // Only show category chips that have at least one benefit to keep UI extremely clean!
-                      
-                      return (
-                        <button
-                          key={cat}
-                          onClick={() => setSelectedCategory(cat)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer ${
-                            selectedCategory === cat
-                              ? 'bg-brand-emerald text-white'
-                              : 'bg-white hover:bg-zinc-100 text-zinc-600 border border-zinc-200'
-                          }`}
-                        >
-                          <span>{cat}</span>
-                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
-                            selectedCategory === cat ? 'bg-white/20 text-white' : 'bg-zinc-100 text-zinc-500'
-                          }`}>
-                            {count}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                </button>
               </div>
+
+              {/* Dynamic Category Folders Grid in a Pop-up Modal */}
+              <AnimatePresence>
+                {showCategoriesPopup && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    {/* Backdrop Overlay */}
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      onClick={() => setShowCategoriesPopup(false)}
+                      className="absolute inset-0 bg-zinc-950/60 backdrop-blur-xs cursor-pointer"
+                    />
+                    
+                    {/* Popup Dialog Content Card */}
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                      transition={{ type: "spring", duration: 0.4, bounce: 0.15 }}
+                      className="bg-[#FDFBF7] rounded-3xl border border-zinc-200 w-full max-w-4xl shadow-2xl relative overflow-hidden flex flex-col max-h-[85vh] z-10"
+                    >
+                      {/* Premium Header */}
+                      <div className="bg-gradient-to-r from-brand-emerald-dark to-brand-emerald px-6 py-4.5 flex items-center justify-between text-white border-b border-brand-gold/25">
+                        <div className="flex items-center gap-3 text-right">
+                          <div className="p-2.5 bg-white/10 rounded-xl text-brand-gold-light shrink-0">
+                            <FolderSync className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-sm sm:text-base text-brand-gold-light">مجلدات وأقسام المكتبة العلمية</h3>
+                            <p className="text-[10px] sm:text-xs text-brand-cream/80 leading-relaxed mt-0.5">انقر على المجلد المناسب لتصفية الفوائد المعروضة، أو أضف تصنيفاً مخصصاً جديداً.</p>
+                          </div>
+                        </div>
+                        
+                        <button
+                          type="button"
+                          onClick={() => setShowCategoriesPopup(false)}
+                          className="p-2 rounded-xl hover:bg-white/10 text-white hover:text-zinc-200 transition-all cursor-pointer"
+                          title="إغلاق النافذة"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      {/* Scrollable category grid content area */}
+                      <div className="p-6 overflow-y-auto space-y-5 text-right font-sans custom-scroll flex-1">
+                        <div className="flex items-center justify-between border-b border-zinc-150 pb-3">
+                          <span className="text-xs font-bold text-zinc-500">اختر من الأقسام المتاحة للتصفية:</span>
+                          
+                          <button
+                            type="button"
+                            onClick={() => setIsAllCategoriesExpanded(!isAllCategoriesExpanded)}
+                            className="text-[11px] font-bold text-brand-emerald hover:text-brand-emerald-dark hover:underline transition-all cursor-pointer"
+                          >
+                            {isAllCategoriesExpanded ? 'طي قائمة الأقسام ⌃' : `عرض جميع التقاسيم العلمية المتاحة (${categories.length}) ⌄`}
+                          </button>
+                        </div>
+
+                        {/* Dynamic Category Folders Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-y-6 gap-x-4 pt-4">
+                          {/* 'All' Folder Card */}
+                          <motion.div
+                            whileHover={{ scale: 1.02, y: -2 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => {
+                              setSelectedCategory('الكل');
+                              setShowCategoriesPopup(false);
+                            }}
+                            role="button"
+                            tabIndex={0}
+                            className={`relative p-4 rounded-2xl rounded-tr-none border text-right transition-all flex flex-col justify-between h-28 cursor-pointer select-none ${
+                              selectedCategory === 'الكل'
+                                ? 'bg-gradient-to-br from-brand-emerald-dark to-brand-emerald text-white border-transparent shadow-md ring-1 ring-brand-gold/25'
+                                : 'bg-white text-zinc-700 border-zinc-200 hover:border-brand-gold/30 hover:shadow-sm shadow-xs'
+                            }`}
+                          >
+                            {/* Realistic Folder Tab */}
+                            <div className={`absolute -top-3.5 right-0 h-3.5 w-16 rounded-t-lg transition-all ${
+                              selectedCategory === 'الكل'
+                                ? 'bg-brand-emerald-dark'
+                                : 'bg-white border-t border-x border-zinc-200'
+                            }`} />
+
+                            <div className={`absolute top-0 left-0 w-1.5 h-full rounded-l-2xl ${
+                              selectedCategory === 'الكل' ? 'bg-brand-gold' : 'bg-brand-emerald'
+                            }`} />
+
+                            <div className="flex justify-between items-start w-full pr-1 z-10">
+                              <div className={`p-2 rounded-xl ${
+                                selectedCategory === 'الكل' ? 'bg-white/10 text-brand-gold-light' : 'bg-brand-cream/40 text-brand-emerald'
+                              }`}>
+                                <Layers className="w-5 h-5" />
+                              </div>
+                              
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                selectedCategory === 'الكل' ? 'bg-white/10 text-brand-gold-light' : 'bg-zinc-100 text-zinc-500'
+                              }`}>
+                                {benefits.length} فائدة
+                              </span>
+                            </div>
+
+                            <div className="pr-1 mt-2 z-10">
+                              <span className="text-xs sm:text-sm font-bold block truncate max-w-full leading-snug">
+                                جميع الفوائد والفرائد
+                              </span>
+                            </div>
+                          </motion.div>
+
+                          {/* Dynamic categories foldered list */}
+                          {(() => {
+                            let catsToShow = categories;
+                            if (!isAllCategoriesExpanded) {
+                              const activeCats = categories.filter(cat => benefits.some(b => b.category === cat));
+                              if (activeCats.length >= 4) {
+                                catsToShow = activeCats;
+                              } else {
+                                const remaining = categories.filter(cat => !activeCats.includes(cat));
+                                catsToShow = [...activeCats, ...remaining.slice(0, 4 - activeCats.length)];
+                              }
+                            }
+
+                            return catsToShow.map(cat => {
+                              const count = benefits.filter(b => b.category === cat).length;
+                              const isActive = selectedCategory === cat;
+                              const isCustom = !CATEGORIES.includes(cat as any);
+                              return (
+                                <motion.div
+                                  key={cat}
+                                  whileHover={{ scale: 1.02, y: -2 }}
+                                  whileTap={{ scale: 0.98 }}
+                                  onClick={() => {
+                                    setSelectedCategory(isActive ? 'الكل' : cat);
+                                    setShowCategoriesPopup(false);
+                                  }}
+                                  role="button"
+                                  tabIndex={0}
+                                  className={`relative p-4 rounded-2xl rounded-tr-none border text-right transition-all flex flex-col justify-between h-28 cursor-pointer select-none ${
+                                    isActive
+                                      ? 'bg-gradient-to-br from-brand-emerald-dark to-brand-emerald text-white border-transparent shadow-md ring-1 ring-brand-gold/25'
+                                      : 'bg-white text-zinc-700 border-zinc-200 hover:border-brand-gold/30 hover:shadow-sm shadow-xs'
+                                  } ${count === 0 ? 'opacity-70 border-dashed bg-zinc-50/20' : ''}`}
+                                >
+                                  {/* Realistic Folder Tab */}
+                                  <div className={`absolute -top-3.5 right-0 h-3.5 w-16 rounded-t-lg transition-all ${
+                                    isActive
+                                      ? 'bg-brand-emerald-dark'
+                                      : 'bg-white border-t border-x border-zinc-200'
+                                  }`} />
+
+                                  <div className={`absolute top-0 left-0 w-1.5 h-full rounded-l-2xl ${
+                                    isActive ? 'bg-brand-gold' : count > 0 ? 'bg-brand-emerald' : 'bg-zinc-300'
+                                  }`} />
+
+                                  <div className="flex justify-between items-start w-full pr-1 z-10">
+                                    <div className="flex items-center gap-1">
+                                      <div className={`p-2 rounded-xl ${
+                                        isActive ? 'bg-white/10 text-brand-gold-light' : 'bg-brand-cream/40 text-brand-emerald'
+                                      }`}>
+                                        <FolderSync className="w-5 h-5" />
+                                      </div>
+                                      {isCustom && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setCategoryToDelete(cat);
+                                          }}
+                                          className={`p-2 rounded-xl transition-all cursor-pointer min-w-[34px] min-h-[34px] flex items-center justify-center ${
+                                            isActive 
+                                              ? 'bg-white/10 text-white hover:text-red-300 hover:bg-white/20' 
+                                              : 'bg-red-50 text-red-500 hover:text-red-700 hover:bg-red-100'
+                                          }`}
+                                          title="حذف هذا القسم"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      )}
+                                    </div>
+                                    
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                      isActive ? 'bg-white/10 text-brand-gold-light' : 'bg-zinc-100 text-zinc-500'
+                                    }`}>
+                                      {count} {count === 1 ? 'فائدة' : 'فوائد'}
+                                    </span>
+                                  </div>
+
+                                  <div className="pr-1 mt-2 z-10">
+                                    <span className="text-xs sm:text-sm font-bold block truncate max-w-full leading-snug">
+                                      {cat}
+                                    </span>
+                                  </div>
+                                </motion.div>
+                              );
+                            });
+                          })()}
+
+                          {/* "+ Add New Section" Card */}
+                          <motion.div
+                            whileHover={{ scale: 1.02, y: -2 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => {
+                              setShowAddCategoryModal(true);
+                            }}
+                            role="button"
+                            tabIndex={0}
+                            className="relative p-4 rounded-2xl rounded-tr-none border-2 border-dashed border-brand-emerald/20 hover:border-brand-emerald/40 bg-zinc-50/50 hover:bg-brand-cream/10 text-brand-emerald text-right transition-all flex flex-col justify-between h-28 cursor-pointer select-none"
+                          >
+                            {/* Realistic Folder Tab */}
+                            <div className="absolute -top-3.5 right-0 h-3.5 w-16 bg-zinc-50 border-t border-x border-dashed border-brand-emerald/20 rounded-t-lg" />
+
+                            <div className="flex justify-between items-start w-full z-10">
+                              <div className="p-2 bg-brand-gold/10 text-brand-gold rounded-xl">
+                                <FolderPlus className="w-5 h-5 animate-pulse" />
+                              </div>
+                              <span className="text-[9px] font-black bg-brand-gold/15 text-brand-gold-dark px-2 py-0.5 rounded-full">
+                                مخصص ➕
+                              </span>
+                            </div>
+                            <div className="z-10">
+                              <span className="text-xs sm:text-sm font-black block leading-snug">
+                                + إضافة قسم جديد
+                              </span>
+                              <span className="text-[10px] text-zinc-450 block mt-0.5">
+                                أنشئ قسماً خاصاً بك
+                              </span>
+                            </div>
+                          </motion.div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
+              </AnimatePresence>
 
               {/* Search Bar placed DIRECTLY above the benefits list */}
               <div className="relative w-full space-y-2">
@@ -1122,6 +1376,8 @@ export default function App() {
                 onSave={handleSaveBenefit}
                 initialBenefit={editingBenefit}
                 prefilledData={prefilledBenefit}
+                categoriesList={categories}
+                onAddCustomCategory={handleAddCustomCategory}
                 onCancel={() => {
                   setEditingBenefit(null);
                   setPrefilledBenefit(null);
@@ -1176,6 +1432,9 @@ export default function App() {
                 onShowWelcome={() => setShowWelcome(true)}
                 activeView="settings"
                 onInstallApp={handleInstallClick}
+                categoriesList={categories}
+                onAddCustomCategory={handleAddCustomCategory}
+                onDeleteCustomCategory={handleDeleteCustomCategory}
               />
             </motion.div>
           )}
@@ -1338,6 +1597,139 @@ export default function App() {
           showToast('أهلاً بك في جامع الفوائد! استمتع بتقييد فرائدك العلمية 📚✨', 'success');
         }}
       />
+
+      {/* Custom Category Deletion Confirmation Modal */}
+      <AnimatePresence>
+        {categoryToDelete && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 15 }}
+              className="bg-white rounded-3xl max-w-sm w-full p-6 text-right font-sans border border-zinc-150 shadow-xl relative"
+            >
+              {/* Close button */}
+              <button
+                onClick={() => setCategoryToDelete(null)}
+                className="absolute left-4 top-4 p-1.5 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100 rounded-lg transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="text-center space-y-1 mb-4">
+                <div className="mx-auto w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center mb-1">
+                  <FolderMinus className="w-6 h-6 animate-pulse" />
+                </div>
+                <h4 className="text-base font-black text-zinc-800 font-sans">حذف المجلد العلمي؟</h4>
+                <p className="text-xs text-zinc-500">أنت على وشك حذف قسم "{categoryToDelete}"</p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="p-3 bg-brand-cream/20 border border-brand-cream/40 rounded-xl">
+                  <p className="text-xs text-brand-emerald-dark leading-relaxed font-sans text-justify">
+                    ⚠️ تيسيراً عليك وحفظاً لمجهودك العلمي، لن تضيع أي فوائد مضافة داخل هذا القسم؛ بل سيتم نقل جميع الفوائد والفرائد المصنفة تحته ({benefits.filter(b => b.category === categoryToDelete).length} فائدة) تلقائياً إلى قسم <strong>"علوم أخرى"</strong>.
+                  </p>
+                </div>
+
+                <div className="flex gap-2 justify-end pt-2">
+                  <button
+                    onClick={() => setCategoryToDelete(null)}
+                    className="px-4 py-2.5 text-xs font-semibold text-zinc-500 hover:bg-zinc-100 rounded-xl transition-all cursor-pointer"
+                  >
+                    تراجع وإلغاء
+                  </button>
+                  <button
+                    onClick={() => handleDeleteCustomCategory(categoryToDelete)}
+                    className="px-5 py-2.5 text-xs font-bold bg-red-600 hover:bg-red-700 text-white rounded-xl transition-all shadow-md cursor-pointer"
+                  >
+                    حذف ونقل الفوائد
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Custom Category Creator Modal */}
+      <AnimatePresence>
+        {showAddCategoryModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 15 }}
+              className="bg-white rounded-3xl max-w-sm w-full p-6 text-right font-sans border border-brand-cream/60 custom-shadow-gold relative"
+            >
+              {/* Close button */}
+              <button
+                onClick={() => {
+                  setShowAddCategoryModal(false);
+                  setNewCatName('');
+                }}
+                className="absolute left-4 top-4 p-1.5 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100 rounded-lg transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="text-center space-y-1 mb-4">
+                <div className="mx-auto w-12 h-12 bg-brand-gold/10 text-brand-gold rounded-full flex items-center justify-center mb-1">
+                  <FolderPlus className="w-6 h-6" />
+                </div>
+                <h4 className="text-base font-black text-brand-emerald-dark font-sans">إنشاء قسم علمي جديد</h4>
+                <p className="text-xs text-zinc-500">أضف مجلداً علمياً جديداً لتصنيف فوائدك بداخله</p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-zinc-600 block">اسم القسم الجديد *</label>
+                  <input
+                    type="text"
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    placeholder="مثال: علم الفرائض والمواريث"
+                    className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-sans text-sm text-zinc-800 bg-zinc-50/50"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const success = handleAddCustomCategory(newCatName);
+                        if (success) {
+                          setNewCatName('');
+                          setShowAddCategoryModal(false);
+                        }
+                      }
+                    }}
+                  />
+                </div>
+
+                <div className="flex gap-2 justify-end pt-2">
+                  <button
+                    onClick={() => {
+                      setShowAddCategoryModal(false);
+                      setNewCatName('');
+                    }}
+                    className="px-4 py-2.5 text-xs font-semibold text-zinc-500 hover:bg-zinc-100 rounded-xl transition-all"
+                  >
+                    إلغاء التراجع
+                  </button>
+                  <button
+                    onClick={() => {
+                      const success = handleAddCustomCategory(newCatName);
+                      if (success) {
+                        setNewCatName('');
+                        setShowAddCategoryModal(false);
+                      }
+                    }}
+                    className="px-5 py-2.5 text-xs font-bold bg-brand-emerald text-white rounded-xl hover:bg-brand-emerald-light transition-all shadow-md cursor-pointer"
+                  >
+                    إنشاء وتصنيف
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Floating Back to Top Button */}
       <AnimatePresence>

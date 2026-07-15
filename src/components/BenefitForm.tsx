@@ -92,6 +92,8 @@ interface BenefitFormProps {
   prefilledData?: Omit<Benefit, 'id' | 'views' | 'isFavorite' | 'createdAt'> | null;
   onCancel?: () => void;
   showToast: (msg: string, type: 'success' | 'info' | 'warning') => void;
+  categoriesList?: string[];
+  onAddCustomCategory?: (name: string) => boolean;
 }
 
 export const BenefitForm: React.FC<BenefitFormProps> = ({
@@ -100,13 +102,35 @@ export const BenefitForm: React.FC<BenefitFormProps> = ({
   prefilledData,
   onCancel,
   showToast,
+  categoriesList = [...CATEGORIES],
+  onAddCustomCategory,
 }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [source, setSource] = useState('');
-  const [category, setCategory] = useState<CategoryType>('العقيدة');
+  const [category, setCategory] = useState<string>('العقيدة');
   const [date, setDate] = useState('');
   const [saveAndContinue, setSaveAndContinue] = useState(false);
+
+  // Custom Category creation inline states
+  const [showAddCategoryInput, setShowAddCategoryInput] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
+  const handleCreateCategory = () => {
+    const cleanName = newCategoryName.trim();
+    if (!cleanName) {
+      showToast('يرجى إدخال اسم فئة/قسم صالح!', 'warning');
+      return;
+    }
+    if (onAddCustomCategory) {
+      const success = onAddCustomCategory(cleanName);
+      if (success) {
+        setCategory(cleanName);
+        setNewCategoryName('');
+        setShowAddCategoryInput(false);
+      }
+    }
+  };
 
   // Voice recognition states
   const [isListeningTitle, setIsListeningTitle] = useState(false);
@@ -250,13 +274,13 @@ export const BenefitForm: React.FC<BenefitFormProps> = ({
       setTitle(initialBenefit.title);
       setContent(initialBenefit.content);
       setSource(initialBenefit.source);
-      setCategory(initialBenefit.category as CategoryType);
+      setCategory(initialBenefit.category as string);
       setDate(initialBenefit.date);
     } else if (prefilledData) {
       setTitle(prefilledData.title);
       setContent(prefilledData.content);
       setSource(prefilledData.source);
-      setCategory(prefilledData.category as CategoryType);
+      setCategory(prefilledData.category as string);
       setDate(prefilledData.date);
     } else {
       // Default to today's date
@@ -504,21 +528,58 @@ export const BenefitForm: React.FC<BenefitFormProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Category Select */}
           <div className="space-y-1.5">
-            <label className="text-sm font-bold text-zinc-700 flex items-center gap-1.5">
-              <Tag className="w-4 h-4 text-brand-gold" />
-              تصنيف/فئة الفائدة
-            </label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value as CategoryType)}
-              className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-sans text-sm text-zinc-700 bg-zinc-50/50"
-            >
-              {CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-bold text-zinc-700 flex items-center gap-1.5">
+                <Tag className="w-4 h-4 text-brand-gold" />
+                تصنيف/فئة الفائدة
+              </label>
+              {onAddCustomCategory && (
+                <button
+                  type="button"
+                  onClick={() => setShowAddCategoryInput(!showAddCategoryInput)}
+                  className="text-xs font-bold text-brand-emerald hover:text-brand-emerald-dark hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  {showAddCategoryInput ? '✕ إلغاء' : '+ إضافة قسم جديد'}
+                </button>
+              )}
+            </div>
+
+            {showAddCategoryInput ? (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="اكتب اسم القسم الجديد... (مثال: الفرائض)"
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-zinc-250 focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-sans text-sm text-zinc-800 bg-white"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleCreateCategory();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleCreateCategory}
+                  className="px-4 py-2.5 bg-brand-emerald hover:bg-brand-emerald-light text-white text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap"
+                >
+                  إضافة
+                </button>
+              </div>
+            ) : (
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-sans text-sm text-zinc-700 bg-zinc-50/50"
+              >
+                {categoriesList.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {/* Source Input */}
