@@ -950,24 +950,52 @@ export function exportBenefitsToPDF(
 /**
  * Generates a regular expression for smart Arabic search.
  * It ignores tashkeel (diacritics), standardizes hamzas, converts Arabic/Eastern and Western digits interchangeably,
- * and matches space with punctuation/spaces.
+ * and matches space with punctuation/spaces. It also supports Arabic ligatures matching.
  */
 export function getArabicSearchRegex(query: string): RegExp | null {
   if (!query || !query.trim()) return null;
   
-  // Clean the query: trim and normalize spacing
-  const cleanQuery = query.trim().replace(/\s+/g, ' ');
+  // Clean the query: trim, normalize spacing, and decompose compatibility presentation forms via NFKC
+  const cleanQuery = query.normalize('NFKC').trim().replace(/\s+/g, ' ');
   if (!cleanQuery) return null;
   
   // Strip diacritics from the search query itself first so they don't interfere
-  const diacriticsRemoved = cleanQuery.replace(/[\u064B-\u065F\u0670]/g, '');
+  let diacriticsRemoved = cleanQuery.replace(/[\u064B-\u065F\u0670]/g, '');
+  
+  // Decompose ligatures in query so the loop handles them properly
+  diacriticsRemoved = diacriticsRemoved.replace(/ﷲ/g, 'الله');
+  diacriticsRemoved = diacriticsRemoved.replace(/[\uFDF2]/g, 'الله');
+  diacriticsRemoved = diacriticsRemoved.replace(/ﻷ/g, 'لأ');
+  diacriticsRemoved = diacriticsRemoved.replace(/[\uFEF7\uFEF8]/g, 'لأ');
+  diacriticsRemoved = diacriticsRemoved.replace(/ﻹ/g, 'لإ');
+  diacriticsRemoved = diacriticsRemoved.replace(/[\uFEF9\uFEFA]/g, 'لإ');
+  diacriticsRemoved = diacriticsRemoved.replace(/ﻵ/g, 'لآ');
+  diacriticsRemoved = diacriticsRemoved.replace(/[\uFEF5\uFEF6]/g, 'لآ');
+  diacriticsRemoved = diacriticsRemoved.replace(/ﻻ/g, 'لا');
+  diacriticsRemoved = diacriticsRemoved.replace(/[\uFEFB\uFEFC]/g, 'لا');
   
   let regexStr = '';
   
   for (let i = 0; i < diacriticsRemoved.length; i++) {
     const char = diacriticsRemoved[i];
+    const nextChar = diacriticsRemoved[i + 1];
     
-    if (/[اأإآٱ]/.test(char)) {
+    // Check for Lam-Alef sequence to match standard form and ligatures
+    if (char === 'ل' && nextChar && /[اأإآ]/.test(nextChar)) {
+      if (nextChar === 'أ') {
+        regexStr += '(?:ل[\\u064B-\\u065F\\u0670]*أ|[\uFEF7\uFEF8])[\\u064B-\\u065F\\u0670]*';
+      } else if (nextChar === 'إ') {
+        regexStr += '(?:ل[\\u064B-\\u065F\\u0670]*إ|[\uFEF9\uFEFA])[\\u064B-\\u065F\\u0670]*';
+      } else if (nextChar === 'آ') {
+        regexStr += '(?:ل[\\u064B-\\u065F\\u0670]*آ|[\uFEF5\uFEF6])[\\u064B-\\u065F\\u0670]*';
+      } else {
+        regexStr += '(?:ل[\\u064B-\\u065F\\u0670]*[اٱ]|[\uFEFB\uFEFC])[\\u064B-\\u065F\\u0670]*';
+      }
+      i++; // Skip next character
+    } else if (char === 'ا' && diacriticsRemoved.substring(i, i + 4) === 'الله') {
+      regexStr += '(?:ا[\\u064B-\\u065F\\u0670]*ل[\\u064B-\\u065F\\u0670]*ل[\\u064B-\\u065F\\u0670]*ه|[\uFDF2])[\\u064B-\\u065F\\u0670]*';
+      i += 3; // Skip ل, ل, ه
+    } else if (/[اأإآٱ]/.test(char)) {
       regexStr += '[اأإآٱ][\\u064B-\\u065F\\u0670]*';
     } else if (/[هة]/.test(char)) {
       regexStr += '[هة][\\u064B-\\u065F\\u0670]*';
@@ -998,7 +1026,7 @@ export function getArabicSearchRegex(query: string): RegExp | null {
     } else if (/[9٩]/.test(char)) {
       regexStr += '[9٩]';
     } else if (char === ' ') {
-      regexStr += '[\\s\\u060C,\\-\\.\\_\\(\\)\\!\\?\\؟]*\\s+';
+      regexStr += '[^a-zA-Z0-9\\u0621-\\u064A\\u0660-\\u0669\\u06F0-\\u06F9\\u064B-\\u065F\\u0670]+';
     } else {
       const escaped = char.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
       regexStr += `${escaped}[\\u064B-\\u065F\\u0670]*`;
@@ -1011,5 +1039,222 @@ export function getArabicSearchRegex(query: string): RegExp | null {
     console.error('Error creating Arabic search regex:', e);
     return null;
   }
+}
+
+/**
+ * Normalizes Arabic text for 100% accurate and reliable search matching.
+ * It strips Tashkeel (diacritics), Kashida (tatweel), zero-width characters, 
+ * control characters (often copied from Maktaba Shamela), Quranic signs, 
+ * standardizes hamzas, converts Taa Marbuta to Haa, and Alef Maqsura to Yaa.
+ */
+export function normalizeArabicText(text: string): string {
+  if (!text) return '';
+  
+  // Use compatibility normalization (NFKC) to resolve Arabic Presentation Forms-A and Forms-B
+  // (e.g. ﺣ, ﺪ, ﺛ, ﻨ, ﺎ, ﷲ, ﻻ, ﻷ, ﻹ, ﻵ) into standard Arabic letters instantly and reliably.
+  let normalized = text.normalize('NFKC').toLowerCase();
+  
+  // 1. Decompose Arabic ligatures (e.g. ﷲ, ﻻ, ﻷ, ﻹ, ﻵ) into separate standard characters (just in case)
+  normalized = normalized.replace(/ﷲ/g, 'الله');
+  normalized = normalized.replace(/[\uFDF2]/g, 'الله');
+  
+  normalized = normalized.replace(/ﻷ/g, 'لأ');
+  normalized = normalized.replace(/[\uFEF7\uFEF8]/g, 'لأ');
+  
+  normalized = normalized.replace(/ﻹ/g, 'لإ');
+  normalized = normalized.replace(/[\uFEF9\uFEFA]/g, 'لإ');
+  
+  normalized = normalized.replace(/ﻵ/g, 'لآ');
+  normalized = normalized.replace(/[\uFEF5\uFEF6]/g, 'لآ');
+  
+  normalized = normalized.replace(/ﻻ/g, 'لا');
+  normalized = normalized.replace(/[\uFEFB\uFEFC]/g, 'لا');
+  
+  // 2. Remove Kashida / Tatweel (ـ)
+  normalized = normalized.replace(/\u0640/g, '');
+  
+  // 3. Remove all zero-width characters, soft hyphens, word joiners, and bidi control characters
+  normalized = normalized.replace(/[\u200B-\u200D\uFEFF\u200E\u200F\u00AD\u202A-\u202E\u2060\u2066-\u2069\u00a0]/g, ' ');
+  
+  // 4. Remove standard Arabic diacritics (tashkeel & Quranic signs)
+  // Fatha, Damma, Kasra, Shadda, Sukun, Tanween (Fathatayn, Dammatayn, Kasratayn), Superscript Alef
+  // Range: \u064B to \u065F, and \u0670. Plus extended Quranic signs: \u06D6 to \u06ED, and \u0610-\u061A
+  normalized = normalized.replace(/[\u064B-\u065F\u0670\u0610-\u061A\u06D6-\u06ED]/g, '');
+  
+  // 5. Normalize hamzas and different shapes of Alef to a plain Alef (ا)
+  normalized = normalized.replace(/[أإآٱ]/g, 'ا');
+  
+  // 6. Normalize Taa Marbuta (ة) to Haa (ه)
+  normalized = normalized.replace(/ة/g, 'ه');
+  
+  // 7. Normalize Alef Maqsura (ى) to Yaa (ي)
+  normalized = normalized.replace(/ى/g, 'ي');
+  
+  // 8. Normalize Hamza variants (ؤ, ئ) to a standalone Hamza (ء)
+  normalized = normalized.replace(/[ؤئ]/g, 'ء');
+  
+  // 9. Remove ornamental Quranic brackets ﴿ ﴾
+  normalized = normalized.replace(/[﴿﴾]/g, '');
+  
+  // 10. Replace punctuation, symbols, and any non-alphanumeric, non-Arabic character with a space to allow clean keyword searching
+  normalized = normalized.replace(/[^a-z0-9\u0621-\u064A\u0660-\u0669\u06F0-\u06F9]/g, ' ');
+  
+  // 11. Collapse multiple spaces into a single space and trim
+  normalized = normalized.replace(/\s+/g, ' ').trim();
+  
+  return normalized;
+}
+
+/**
+ * Finds matching ranges/spans in original text based on a normalized query.
+ * This ensures that even if the original text contains diacritics, presentation forms,
+ * ligatures, or punctuation, highlighting will still accurately target the original characters.
+ */
+export function getHighlightSpans(originalText: string, query: string): { start: number; end: number }[] {
+  if (!originalText || !query || !query.trim()) return [];
+  
+  // Clean query similarly to how we clean text
+  const cleanQuery = query.normalize('NFKC').toLowerCase()
+    .replace(/[\u064B-\u065F\u0670\u0610-\u061A\u06D6-\u06ED]/g, '');
+  
+  const simplifiedQueryChars: string[] = [];
+  for (let i = 0; i < cleanQuery.length; i++) {
+    let char = cleanQuery[i];
+    if (/[أإآٱ]/.test(char)) {
+      char = 'ا';
+    } else if (char === 'ة') {
+      char = 'ه';
+    } else if (char === 'ى') {
+      char = 'ي';
+    } else if (/[ؤئ]/.test(char)) {
+      char = 'ء';
+    } else if (/[﴿﴾]/.test(char)) {
+      continue;
+    } else if (/[^a-z0-9\u0621-\u064A\u0660-\u0669\u06F0-\u06F9]/.test(char)) {
+      char = ' ';
+    }
+    simplifiedQueryChars.push(char);
+  }
+  
+  // Collapse spaces in simplifiedQuery
+  const collapsedQueryChars: string[] = [];
+  for (let i = 0; i < simplifiedQueryChars.length; i++) {
+    const c = simplifiedQueryChars[i];
+    if (c === ' ') {
+      if (collapsedQueryChars.length > 0 && collapsedQueryChars[collapsedQueryChars.length - 1] !== ' ') {
+        collapsedQueryChars.push(' ');
+      }
+    } else {
+      collapsedQueryChars.push(c);
+    }
+  }
+  const finalQuery = collapsedQueryChars.join('').trim();
+  if (!finalQuery) return [];
+  
+  // Now, build clean mapping of the original text
+  const cleanTextChars: string[] = [];
+  const origIndices: number[] = [];
+  
+  for (let i = 0; i < originalText.length; i++) {
+    const char = originalText[i];
+    
+    // Check for ignored characters
+    const isDiacritic = /[\u064B-\u065F\u0670\u0610-\u061A\u06D6-\u06ED]/.test(char);
+    const isKashida = char === '\u0640';
+    const isZeroWidthOrBidi = /[\u200B-\u200D\uFEFF\u200E\u200F\u00AD\u202A-\u202E\u2060\u2066-\u2069\u00a0]/.test(char);
+    
+    if (isDiacritic || isKashida || isZeroWidthOrBidi) {
+      continue;
+    }
+    
+    let normalizedChar = char.normalize('NFKC').toLowerCase();
+    
+    // Manual fallbacks
+    if (normalizedChar === 'ﷲ' || normalizedChar === '\uFDF2') {
+      normalizedChar = 'الله';
+    } else if (normalizedChar === 'ﻷ' || normalizedChar === '\uFEF7' || normalizedChar === '\uFEF8') {
+      normalizedChar = 'لأ';
+    } else if (normalizedChar === 'ﻹ' || normalizedChar === '\uFEF9' || normalizedChar === '\uFEFA') {
+      normalizedChar = 'لإ';
+    } else if (normalizedChar === 'ﻵ' || normalizedChar === '\uFEF5' || normalizedChar === '\uFEF6') {
+      normalizedChar = 'لآ';
+    } else if (normalizedChar === 'ﻻ' || normalizedChar === '\uFEFB' || normalizedChar === '\uFEFC') {
+      normalizedChar = 'لا';
+    }
+    
+    for (let j = 0; j < normalizedChar.length; j++) {
+      let subChar = normalizedChar[j];
+      
+      if (/[أإآٱ]/.test(subChar)) {
+        subChar = 'ا';
+      } else if (subChar === 'ة') {
+        subChar = 'ه';
+      } else if (subChar === 'ى') {
+        subChar = 'ي';
+      } else if (/[ؤئ]/.test(subChar)) {
+        subChar = 'ء';
+      } else if (/[﴿﴾]/.test(subChar)) {
+        continue;
+      } else if (/[^a-z0-9\u0621-\u064A\u0660-\u0669\u06F0-\u06F9]/.test(subChar)) {
+        subChar = ' ';
+      }
+      
+      cleanTextChars.push(subChar);
+      origIndices.push(i);
+    }
+  }
+  
+  // Collapse spaces and adjust origIndices
+  const finalCleanChars: string[] = [];
+  const finalOrigIndices: number[] = [];
+  
+  for (let k = 0; k < cleanTextChars.length; k++) {
+    const c = cleanTextChars[k];
+    if (c === ' ') {
+      if (finalCleanChars.length > 0 && finalCleanChars[finalCleanChars.length - 1] !== ' ') {
+        finalCleanChars.push(' ');
+        finalOrigIndices.push(origIndices[k]);
+      }
+    } else {
+      finalCleanChars.push(c);
+      finalOrigIndices.push(origIndices[k]);
+    }
+  }
+  
+  const cleanText = finalCleanChars.join('');
+  const spans: { start: number; end: number }[] = [];
+  let index = cleanText.indexOf(finalQuery);
+  
+  while (index !== -1) {
+    const matchStartInClean = index;
+    const matchEndInClean = index + finalQuery.length - 1;
+    
+    const startInOrig = finalOrigIndices[matchStartInClean];
+    const endInOrig = matchEndInClean < finalOrigIndices.length - 1 
+      ? finalOrigIndices[matchEndInClean + 1] 
+      : originalText.length;
+    
+    if (startInOrig !== undefined && endInOrig !== undefined && startInOrig < endInOrig) {
+      spans.push({ start: startInOrig, end: endInOrig });
+    }
+    
+    index = cleanText.indexOf(finalQuery, index + 1);
+  }
+  
+  if (spans.length <= 1) return spans;
+  
+  spans.sort((a, b) => a.start - b.start);
+  const merged: { start: number; end: number }[] = [spans[0]];
+  for (let i = 1; i < spans.length; i++) {
+    const last = merged[merged.length - 1];
+    const curr = spans[i];
+    if (curr.start <= last.end) {
+      last.end = Math.max(last.end, curr.end);
+    } else {
+      merged.push(curr);
+    }
+  }
+  
+  return merged;
 }
 

@@ -17,6 +17,16 @@ service cloud.firestore {
       allow read, write: if isValidId(backupId);
     }
 
+    // P2P Peers collection for live discovery
+    match /p2p_peers/{peerId} {
+      allow read, write: if isValidId(peerId);
+    }
+
+    // P2P Transfers collection for live sharing
+    match /p2p_transfers/{transferId} {
+      allow read, write: if isValidId(transferId);
+    }
+
     // Cloud Backups collection
     match /cloud_backups/{backupId} {
       allow read, write: if isValidId(backupId);

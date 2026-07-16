@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Download, Upload, Cloud, RefreshCw, Bell, User, Mail, ShieldCheck, ExternalLink, HelpCircle, Check, AlertTriangle, Play, Smartphone, Copy, Key, Lock, Unlock, Trash2, FolderPlus, FolderSync, X } from 'lucide-react';
+import { Download, Upload, Cloud, RefreshCw, Bell, User, Mail, ShieldCheck, ExternalLink, HelpCircle, Check, AlertTriangle, Play, Smartphone, Copy, Key, Lock, Unlock, Trash2, FolderPlus, FolderSync, X, Wifi, Bluetooth, Radio, Activity, CheckCircle, XCircle } from 'lucide-react';
 import { AppSettings, Benefit, ScientificQuery, CATEGORIES } from '../types';
 import { exportBenefitsToPDF, formatToHijriAndGregorian } from '../utils';
 import { 
@@ -82,6 +82,11 @@ interface SettingsPanelProps {
   categoriesList?: string[];
   onAddCustomCategory?: (name: string) => boolean;
   onDeleteCustomCategory?: (name: string) => void;
+  isP2PReceiveActive?: boolean;
+  onToggleP2PReceive?: (active: boolean) => void;
+  myPeerId?: string;
+  p2pMode?: 'wifi' | 'bluetooth';
+  onToggleP2PMode?: (mode: 'wifi' | 'bluetooth') => void;
 }
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -103,6 +108,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   categoriesList = [...CATEGORIES],
   onAddCustomCategory,
   onDeleteCustomCategory,
+  isP2PReceiveActive = false,
+  onToggleP2PReceive,
+  myPeerId = '',
+  p2pMode = 'wifi',
+  onToggleP2PMode,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingBackupAfterLoginRef = useRef<boolean>(false);
@@ -1527,8 +1537,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
             {/* Local Phone Backup */}
             <div className="p-4 rounded-xl border border-zinc-100 bg-zinc-50/40 flex flex-col justify-between">
-              <div className="space-y-1">
-                <h4 className="text-sm font-bold text-zinc-800">تصدير واستيراد ملف يدوي (.json)</h4>
+              <div className="space-y-1 text-right">
+                <h4 className="text-sm font-bold text-zinc-800">تصدير واستيراد ملف يدوي (.json) 💾</h4>
                 <p className="text-xs text-zinc-500 leading-relaxed">
                   قم بتنزيل ملف النسخة الاحتياطية على جهازك أو استرجاع بياناتك السابقة عبر رفع الملف في أي وقت.
                 </p>
@@ -1565,7 +1575,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
             {/* Google Drive Cloud Backup */}
             <div className="p-4 rounded-xl border border-zinc-100 bg-zinc-50/40 flex flex-col justify-between relative overflow-hidden">
-              <div className="space-y-1">
+              <div className="space-y-1 text-right">
                 <div className="flex items-center gap-2">
                   <h4 className="text-sm font-bold text-zinc-800">جوجل درايف السحابي (Google Drive) ☁️</h4>
                   {isActivated ? (
@@ -1659,9 +1669,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 )}
               </div>
             </div>
+
             {/* Automatic Backup Settings Card (Premium Only) */}
             <div className="p-4 rounded-xl border border-zinc-100 bg-zinc-50/40 flex flex-col justify-between relative overflow-hidden">
-              <div className="space-y-1">
+              <div className="space-y-1 text-right">
                 <div className="flex items-center gap-2">
                   <h4 className="text-sm font-bold text-zinc-800">النسخ الاحتياطي التلقائي المميز 👑</h4>
                   {isActivated ? (
@@ -1688,7 +1699,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   }}
                   className="bg-zinc-100/70 hover:bg-zinc-100/90 rounded-xl p-4 border border-zinc-200/50 flex flex-col items-center justify-center text-center space-y-2 mt-4 cursor-pointer transition-all"
                 >
-                  <p className="text-[11px] text-zinc-500 font-bold leading-relaxed">
+                  <p className="text-[11px] text-zinc-550 font-bold leading-relaxed">
                     النسخ الاحتياطي التلقائي (المحلي والسحابي) هو ميزة حصرية خاصة بأصحاب النسخة الذهبية المميزة 👑
                   </p>
                   <button
@@ -1744,6 +1755,80 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* P2P Local Sharing/Reception Radar & Bluetooth */}
+            <div className="mt-4 p-4 rounded-2xl border border-brand-emerald/20 bg-[#F5F8F5] relative overflow-hidden">
+              <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-brand-emerald to-emerald-700" />
+              
+              {/* header area */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+                <div className="flex items-center gap-2.5 text-right">
+                  <span className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+                    isP2PReceiveActive ? 'bg-brand-emerald/15 text-brand-emerald border border-brand-emerald/35' : 'bg-zinc-150 text-zinc-500'
+                  }`}>
+                    <Bluetooth className={`w-5 h-5 ${isP2PReceiveActive ? 'animate-pulse' : ''}`} />
+                  </span>
+                  <div>
+                    <h4 className="text-sm font-extrabold text-zinc-800">تبادل ومشاركة الفوائد بالبلوتوث الذكي (Bluetooth P2P) 📡</h4>
+                    <p className="text-[11px] text-zinc-550">أرسل واستقبل الفوائد والفرائد العلمية مباشرة وبدون إنترنت مع الباحثين حولك</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* content and details */}
+              <div className="p-3.5 rounded-xl bg-white border border-zinc-150 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                <div className="space-y-1 text-right">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-zinc-750">حالة رادار البلوتوث:</span>
+                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
+                      isP2PReceiveActive
+                        ? 'bg-emerald-600 text-white animate-pulse'
+                        : 'bg-zinc-150 text-zinc-500'
+                    }`}>
+                      {isP2PReceiveActive ? 'نشط ومكتشف الآن عبر BLE' : 'مغلق'}
+                    </span>
+                    {myPeerId && isP2PReceiveActive && (
+                      <span className="text-[9px] font-mono text-zinc-400 bg-zinc-100 px-1 py-0.5 rounded">ID: {myPeerId.slice(-5)}</span>
+                    )}
+                  </div>
+                  
+                  <p className="text-xs text-zinc-550 leading-relaxed font-sans">
+                    {isP2PReceiveActive ? (
+                      <span>
+                        جهازك يبث الآن نبضات البلوتوث الذكية (Bluetooth Low Energy) تحت المعرّف العلمي: <strong className="text-brand-emerald-dark font-black">« {settings.programmerName || 'طالب العلم'} »</strong>. يرجى إبقاء هذه الصفحة مفتوحة عند زميلك لتسهيل العثور عليك ونقل الفائدة له مباشرة.
+                      </span>
+                    ) : (
+                      <span>
+                        قم بتفعيل رادار البلوتوث لتتمكن من استقبال الفوائد المرسلة إليك من زملائك والباحثين القريبين منك في قاعة العلم أو المكتبة مجاناً وبدون إنترنت.
+                      </span>
+                    )}
+                  </p>
+                </div>
+
+                {/* Action Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => onToggleP2PReceive && onToggleP2PReceive(!isP2PReceiveActive)}
+                  className={`w-full lg:w-auto px-4 py-2.5 rounded-xl font-sans text-xs font-black transition-all cursor-pointer shadow-sm select-none whitespace-nowrap text-center flex items-center justify-center gap-1.5 shrink-0 active:scale-95 ${
+                    isP2PReceiveActive
+                      ? 'bg-red-50 hover:bg-red-100 text-red-650 border border-red-200'
+                      : 'bg-brand-emerald hover:bg-brand-emerald-light text-white border border-transparent'
+                  }`}
+                >
+                  {isP2PReceiveActive ? (
+                    <>
+                      <XCircle className="w-3.5 h-3.5" />
+                      <span>إيقاف رادار البلوتوث</span>
+                    </>
+                  ) : (
+                    <>
+                      <Activity className="w-3.5 h-3.5 animate-pulse" />
+                      <span>تشغيل الاستقبال بالبلوتوث</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

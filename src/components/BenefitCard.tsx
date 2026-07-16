@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Heart, Eye, Share2, Edit, Trash, Copy, Check, ChevronDown, ChevronUp, BookOpen, Calendar, Tag, Sparkles } from 'lucide-react';
+import { Heart, Eye, Share2, Edit, Trash, Copy, Check, ChevronDown, ChevronUp, BookOpen, Calendar, Tag, Sparkles, Wifi } from 'lucide-react';
 import { Benefit } from '../types';
-import { formatToHijriAndGregorian, getArabicSearchRegex } from '../utils';
+import { formatToHijriAndGregorian, getHighlightSpans } from '../utils';
 
 interface BenefitCardProps {
   benefit: Benefit;
@@ -12,6 +12,7 @@ interface BenefitCardProps {
   onDelete: (id: string) => void;
   showToast: (msg: string, type: 'success' | 'info' | 'warning') => void;
   onOpenShareCard: (benefit: Benefit) => void;
+  onLocalShare?: (benefit: Benefit) => void;
   forceExpanded?: boolean;
   searchQuery?: string;
 }
@@ -21,32 +22,40 @@ function highlightText(text: string, query: string | undefined): React.ReactNode
   if (!text) return '';
   if (!query || !query.trim()) return text;
 
-  const regex = getArabicSearchRegex(query);
-  if (!regex) return text;
+  const spans = getHighlightSpans(text, query);
+  if (spans.length === 0) return text;
 
-  const parts = text.split(regex);
+  const result: React.ReactNode[] = [];
+  let lastIndex = 0;
 
-  return (
-    <>
-      {parts.map((part, index) => {
-        // Reset the regex index before testing because of the global 'g' flag
-        regex.lastIndex = 0;
-        const isMatch = regex.test(part);
-        
-        if (isMatch) {
-          return (
-            <mark
-              key={index}
-              className="bg-yellow-200 text-yellow-950 font-bold px-0.5 rounded-sm"
-            >
-              {part}
-            </mark>
-          );
-        }
-        return <React.Fragment key={index}>{part}</React.Fragment>;
-      })}
-    </>
-  );
+  spans.forEach((span, i) => {
+    if (span.start > lastIndex) {
+      result.push(
+        <React.Fragment key={`text-${i}`}>
+          {text.substring(lastIndex, span.start)}
+        </React.Fragment>
+      );
+    }
+    result.push(
+      <mark
+        key={`mark-${i}`}
+        className="bg-yellow-200 text-yellow-950 font-bold px-0.5 rounded-sm"
+      >
+        {text.substring(span.start, span.end)}
+      </mark>
+    );
+    lastIndex = span.end;
+  });
+
+  if (lastIndex < text.length) {
+    result.push(
+      <React.Fragment key="text-end">
+        {text.substring(lastIndex)}
+      </React.Fragment>
+    );
+  }
+
+  return <>{result}</>;
 }
 
 export const BenefitCard: React.FC<BenefitCardProps> = ({
@@ -57,6 +66,7 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
   onDelete,
   showToast,
   onOpenShareCard,
+  onLocalShare,
   forceExpanded,
   searchQuery,
 }) => {
@@ -328,6 +338,24 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
                                 </span>
                                 <span className="text-[9px] text-brand-gold-dark font-black bg-brand-gold/15 px-1.5 py-0.5 rounded">ذهبي 👑</span>
                               </button>
+
+                              {/* Option 3: Local P2P offline-style sharing */}
+                              {onLocalShare && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowShareMenu(false);
+                                    onLocalShare(benefit);
+                                  }}
+                                  className="w-full text-right px-2.5 py-2 hover:bg-zinc-100 text-zinc-750 font-bold text-xs flex items-center justify-between rounded-lg transition-colors cursor-pointer"
+                                >
+                                  <span className="flex items-center gap-2">
+                                    <Wifi className="w-3.5 h-3.5 text-brand-emerald animate-pulse" />
+                                    <span>مشاركة محلية (دون إنترنت)</span>
+                                  </span>
+                                  <span className="text-[9px] text-brand-emerald font-black bg-brand-emerald/10 px-1.5 py-0.5 rounded">P2P 📡</span>
+                                </button>
+                              )}
                             </motion.div>
                           </>
                         )}

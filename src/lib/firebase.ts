@@ -11,7 +11,10 @@ import {
   setDoc, 
   orderBy, 
   limit,
-  Timestamp 
+  Timestamp,
+  onSnapshot,
+  updateDoc,
+  getDoc
 } from "firebase/firestore";
 
 // Firebase Configuration from firebase-applet-config.json
@@ -122,4 +125,201 @@ export const listBackupsFromFirebase = async (
 export const deleteBackupFromFirebase = async (backupId: string): Promise<void> => {
   const docRef = doc(db, "backups", backupId);
   await deleteDoc(docRef);
+};
+
+export interface P2PPeer {
+  id: string;
+  name: string;
+  lastSeen: number;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+export interface P2PTransfer {
+  id: string;
+  senderId: string;
+  senderName: string;
+  receiverId: string;
+  benefitData: {
+    title: string;
+    content: string;
+    category: string;
+    source: string;
+  };
+  status: 'pending' | 'accepted' | 'declined';
+  createdAt: number;
+}
+
+/**
+ * Calculates the Haversine distance between two sets of GPS coordinates in meters
+ */
+export const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371e3; // Earth's radius in meters
+  const phi1 = (lat1 * Math.PI) / 180;
+  const phi2 = (lat2 * Math.PI) / 180;
+  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+    Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // returns distance in meters
+};
+
+/**
+ * Register or update peer status with optional geolocation coordinates
+ */
+export const registerP2PPeer = async (
+  peerId: string, 
+  name: string, 
+  latitude?: number | null, 
+  longitude?: number | null
+): Promise<void> => {
+  try {
+    const peerDoc = doc(db, "p2p_peers", peerId);
+    await setDoc(peerDoc, {
+      id: peerId,
+      name: name,
+      lastSeen: Date.now(),
+      latitude: latitude !== undefined ? latitude : null,
+      longitude: longitude !== undefined ? longitude : null
+    }, { merge: true });
+  } catch (error) {
+    console.error("Failed to register P2P Peer:", error);
+  }
+};
+
+/**
+ * Unregister peer status (cleanup on disabling)
+ */
+export const unregisterP2PPeer = async (peerId: string): Promise<void> => {
+  try {
+    const peerDoc = doc(db, "p2p_peers", peerId);
+    await deleteDoc(peerDoc);
+  } catch (error) {
+    console.error("Failed to unregister P2P Peer:", error);
+  }
+};
+
+/**
+ * Fetch all active peers except current peer
+ */
+export const fetchActiveP2PPeers = async (myPeerId: string): Promise<P2PPeer[]> => {
+  try {
+    const peersColl = collection(db, "p2p_peers");
+    const snap = await getDocs(peersColl);
+    const peers: P2PPeer[] = [];
+    const now = Date.now();
+    snap.forEach((docSnap) => {
+      const data = docSnap.data() as P2PPeer;
+      // Filter out self, and filter out peers that haven't been seen in the last 15 minutes (900,000 ms)
+      // This is extremely robust against clock skews or minor delays.
+      if (data.id && data.id !== myPeerId && (now - (data.lastSeen || 0)) < 900000) {
+        peers.push(data);
+      }
+    });
+    return peers;
+  } catch (error) {
+    console.error("Failed to fetch active peers:", error);
+    return [];
+  }
+};
+
+/**
+ * Send a benefit to a receiver
+ */
+export const initiateP2PTransfer = async (
+  senderId: string,
+  senderName: string,
+  receiverId: string,
+  benefit: { title: string; content: string; category: string; source: string }
+): Promise<string> => {
+  const transferId = `transfer-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const transferDoc: P2PTransfer = {
+    id: transferId,
+    senderId,
+    senderName,
+    receiverId,
+    benefitData: {
+      title: benefit.title,
+      content: benefit.content,
+      category: benefit.category,
+      source: benefit.source || ""
+    },
+    status: 'pending',
+    createdAt: Date.now()
+  };
+  await setDoc(doc(db, "p2p_transfers", transferId), transferDoc);
+  return transferId;
+};
+
+/**
+ * Accept a transfer
+ */
+export const acceptP2PTransfer = async (transferId: string): Promise<void> => {
+  const transferDoc = doc(db, "p2p_transfers", transferId);
+  await updateDoc(transferDoc, { status: 'accepted' });
+};
+
+/**
+ * Decline a transfer
+ */
+export const declineP2PTransfer = async (transferId: string): Promise<void> => {
+  const transferDoc = doc(db, "p2p_transfers", transferId);
+  await updateDoc(transferDoc, { status: 'declined' });
+};
+
+/**
+ * Listen to incoming transfers targeting current peer
+ * Querying by receiverId only avoids needing complex multi-field composite indexes.
+ */
+export const listenToIncomingTransfers = (
+  myPeerId: string,
+  onNewTransfer: (transfer: P2PTransfer) => void
+): (() => void) => {
+  const transfersColl = collection(db, "p2p_transfers");
+  const q = query(
+    transfersColl,
+    where("receiverId", "==", myPeerId)
+  );
+  return onSnapshot(q, (snapshot) => {
+    snapshot.docChanges().forEach((change) => {
+      if (change.type === "added" || change.type === "modified") {
+        const data = change.doc.data() as P2PTransfer;
+        if (data.status === 'pending') {
+          onNewTransfer(data);
+        }
+      }
+    });
+  });
+};
+
+/**
+ * Listen to a specific transfer's status updates (for the sender to monitor)
+ */
+export const listenToTransferStatus = (
+  transferId: string,
+  onStatusChange: (status: 'pending' | 'accepted' | 'declined') => void
+): (() => void) => {
+  const transferDoc = doc(db, "p2p_transfers", transferId);
+  return onSnapshot(transferDoc, (docSnap) => {
+    if (docSnap.exists()) {
+      const data = docSnap.data() as P2PTransfer;
+      onStatusChange(data.status);
+    }
+  });
+};
+
+/**
+ * Delete a transfer record (cleanup)
+ */
+export const deleteTransferRecord = async (transferId: string): Promise<void> => {
+  try {
+    const docRef = doc(db, "p2p_transfers", transferId);
+    await deleteDoc(docRef);
+  } catch (error) {
+    console.error("Failed to delete transfer record:", error);
+  }
 };
