@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { AlertTriangle, CheckCircle2, Trash, Edit, Plus, Save, X, BookOpen, Calendar, HelpCircle, CheckSquare, Square, Mic, MicOff, Sparkles } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Trash, Edit, Plus, Save, X, BookOpen, Calendar, HelpCircle, CheckSquare, Square, Mic, MicOff, Sparkles, Infinity as InfinityIcon } from 'lucide-react';
 import { ScientificQuery } from '../types';
 import { formatToHijriAndGregorian } from '../utils';
 
@@ -329,14 +329,20 @@ export const QueryManager: React.FC<QueryManagerProps> = ({
 
               {/* Content input */}
               <div className="space-y-1.5">
-                <label className="text-sm font-bold text-zinc-700">نص الاستشكال واللبس بالتفصيل *</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-bold text-zinc-700">نص الاستشكال واللبس بالتفصيل *</label>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                    <InfinityIcon className="w-3 h-3 text-emerald-600" />
+                    <span>سعة مفتوحة لا محدودة</span>
+                  </span>
+                </div>
                 <div className="relative">
                   <textarea
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
-                    placeholder="وضح المسألة والوجه الذي وقع فيه الإشكال بدقة وعناية..."
-                    rows={4}
-                    className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-serif text-sm text-zinc-800 bg-zinc-50/50 leading-relaxed"
+                    placeholder="وضح المسألة والوجه الذي وقع فيه الإشكال بدقة وعناية... (بدون أي حد أقصى للحجم)"
+                    rows={5}
+                    className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-serif text-sm text-zinc-800 bg-zinc-50/50 leading-relaxed resize-y"
                   />
                   <button
                     type="button"
@@ -350,6 +356,10 @@ export const QueryManager: React.FC<QueryManagerProps> = ({
                   >
                     {listeningField === 'content' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                   </button>
+                </div>
+                <div className="flex items-center justify-between text-[11px] font-sans text-zinc-500 px-1 pt-0.5">
+                  <span>الكلمات: {(content.trim() ? content.trim().split(/\s+/).length : 0).toLocaleString('ar-SA')} • الحروف: {content.length.toLocaleString('ar-SA')}</span>
+                  <span className="text-emerald-700 font-bold">♾️ استيعاب غير محدود</span>
                 </div>
               </div>
 

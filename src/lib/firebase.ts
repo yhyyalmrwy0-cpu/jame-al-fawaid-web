@@ -1,37 +1,7 @@
-import { initializeApp } from "firebase/app";
-import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  getDocs, 
-  query, 
-  where, 
-  deleteDoc, 
-  doc, 
-  setDoc, 
-  orderBy, 
-  limit,
-  Timestamp,
-  onSnapshot,
-  updateDoc,
-  getDoc
-} from "firebase/firestore";
+// Clean Local & Offline Storage Engine (Firebase Free)
 
-// Firebase Configuration from firebase-applet-config.json
-const firebaseConfig = {
-  apiKey: "AIzaSyDlUkuAywTTWCPAZZ0xMcVEmD3wCQsMu_0",
-  authDomain: "silken-being-x2t1j.firebaseapp.com",
-  projectId: "silken-being-x2t1j",
-  storageBucket: "silken-being-x2t1j.firebasestorage.app",
-  messagingSenderId: "808282091165",
-  appId: "1:808282091165:web:c7790bbdc985bb4c9fee74"
-};
-
-// Initialize Firebase App
-const app = initializeApp(firebaseConfig);
-
-// Initialize Firestore with the specific custom database ID
-export const db = getFirestore(app, "ai-studio-remix-e036a879-8e87-4762-b7b9-e2b68e5e4e8c");
+export const getDb = () => null;
+export const db = null;
 
 export interface FirebaseBackup {
   id: string;
@@ -42,11 +12,11 @@ export interface FirebaseBackup {
   data: string; // JSON string
   code: string;  // Activation key
   email?: string;
-  createdAt: any;
+  createdAt: number;
 }
 
 /**
- * Save backup data to Firebase Firestore
+ * Save backup data locally
  */
 export const saveBackupToFirebase = async (
   code: string,
@@ -54,9 +24,9 @@ export const saveBackupToFirebase = async (
   backupData: { trigger: string; benefitsCount: number; queriesCount: number; data: string }
 ): Promise<FirebaseBackup> => {
   const normalizedCode = code.trim().toUpperCase();
-  const backupId = `firebase-${Date.now()}`;
+  const backupId = `local-${Date.now()}`;
   
-  const backupDoc: Omit<FirebaseBackup, "createdAt"> & { createdAt: Timestamp } = {
+  const backupDoc: FirebaseBackup = {
     id: backupId,
     timestamp: Date.now(),
     trigger: backupData.trigger || "manual",
@@ -65,66 +35,57 @@ export const saveBackupToFirebase = async (
     data: backupData.data,
     code: normalizedCode,
     email: email ? email.trim().toLowerCase() : "",
-    createdAt: Timestamp.now()
+    createdAt: Date.now()
   };
 
-  const docRef = doc(db, "backups", backupId);
-  await setDoc(docRef, backupDoc);
-  
-  return {
-    ...backupDoc,
-    createdAt: backupDoc.createdAt.toMillis()
-  };
+  try {
+    const existing = localStorage.getItem('abuosid_backups_history');
+    const list = existing ? JSON.parse(existing) : [];
+    list.unshift(backupDoc);
+    localStorage.setItem('abuosid_backups_history', JSON.stringify(list.slice(0, 20)));
+  } catch (e) {
+    console.warn("Local storage write error:", e);
+  }
+
+  return backupDoc;
 };
 
 /**
- * List backups from Firebase Firestore filtered by Code and optional Email
+ * List backups from local storage
  */
 export const listBackupsFromFirebase = async (
   code: string,
   email?: string
 ): Promise<any[]> => {
-  const normalizedCode = code.trim().toUpperCase();
-  const backupsColl = collection(db, "backups");
-  
-  let q = query(
-    backupsColl, 
-    where("code", "==", normalizedCode)
-  );
-
-  const querySnapshot = await getDocs(q);
-  const backups: any[] = [];
-  
-  querySnapshot.forEach((docSnap) => {
-    const data = docSnap.data();
-    // Filter by email if provided
-    if (email) {
-      const emailMatch = (data.email || "").trim().toLowerCase() === email.trim().toLowerCase();
-      if (!emailMatch) return;
-    }
-    backups.push({
-      id: data.id || docSnap.id,
-      timestamp: data.timestamp,
-      trigger: data.trigger,
-      benefitsCount: data.benefitsCount,
-      queriesCount: data.queriesCount,
-      data: data.data,
-      isFirebase: true
+  try {
+    const existing = localStorage.getItem('abuosid_backups_history');
+    if (!existing) return [];
+    const list = JSON.parse(existing);
+    const normalizedCode = code.trim().toUpperCase();
+    return list.filter((b: any) => {
+      if (b.code && b.code !== normalizedCode) return false;
+      if (email && b.email && b.email.trim().toLowerCase() !== email.trim().toLowerCase()) return false;
+      return true;
     });
-  });
-
-  // Sort by timestamp descending in memory to avoid Firestore composite index requirement
-  backups.sort((a, b) => b.timestamp - a.timestamp);
-
-  return backups;
+  } catch (e) {
+    console.warn("Failed to fetch backups:", e);
+    return [];
+  }
 };
 
 /**
- * Delete a backup from Firebase Firestore
+ * Delete a backup from local storage
  */
 export const deleteBackupFromFirebase = async (backupId: string): Promise<void> => {
-  const docRef = doc(db, "backups", backupId);
-  await deleteDoc(docRef);
+  try {
+    const existing = localStorage.getItem('abuosid_backups_history');
+    if (!existing) return;
+    const list = JSON.parse(existing);
+    const updated = list.filter((b: any) => b.id !== backupId);
+    localStorage.setItem('abuosid_backups_history', JSON.stringify(updated));
+  } catch (e) {
+    console.warn("Failed to delete backup:", e);
+  }
 };
 
 export interface P2PPeer {
@@ -168,158 +129,45 @@ export const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2
   return R * c; // returns distance in meters
 };
 
-/**
- * Register or update peer status with optional geolocation coordinates
- */
 export const registerP2PPeer = async (
-  peerId: string, 
-  name: string, 
-  latitude?: number | null, 
-  longitude?: number | null
-): Promise<void> => {
-  try {
-    const peerDoc = doc(db, "p2p_peers", peerId);
-    await setDoc(peerDoc, {
-      id: peerId,
-      name: name,
-      lastSeen: Date.now(),
-      latitude: latitude !== undefined ? latitude : null,
-      longitude: longitude !== undefined ? longitude : null
-    }, { merge: true });
-  } catch (error) {
-    console.error("Failed to register P2P Peer:", error);
-  }
+  _peerId: string, 
+  _name: string, 
+  _latitude?: number | null, 
+  _longitude?: number | null
+): Promise<void> => {};
+
+export const unregisterP2PPeer = async (_peerId: string): Promise<void> => {};
+
+export const fetchActiveP2PPeers = async (_myPeerId: string): Promise<P2PPeer[]> => {
+  return [];
 };
 
-/**
- * Unregister peer status (cleanup on disabling)
- */
-export const unregisterP2PPeer = async (peerId: string): Promise<void> => {
-  try {
-    const peerDoc = doc(db, "p2p_peers", peerId);
-    await deleteDoc(peerDoc);
-  } catch (error) {
-    console.error("Failed to unregister P2P Peer:", error);
-  }
-};
-
-/**
- * Fetch all active peers except current peer
- */
-export const fetchActiveP2PPeers = async (myPeerId: string): Promise<P2PPeer[]> => {
-  try {
-    const peersColl = collection(db, "p2p_peers");
-    const snap = await getDocs(peersColl);
-    const peers: P2PPeer[] = [];
-    const now = Date.now();
-    snap.forEach((docSnap) => {
-      const data = docSnap.data() as P2PPeer;
-      // Filter out self, and filter out peers that haven't been seen in the last 15 minutes (900,000 ms)
-      // This is extremely robust against clock skews or minor delays.
-      if (data.id && data.id !== myPeerId && (now - (data.lastSeen || 0)) < 900000) {
-        peers.push(data);
-      }
-    });
-    return peers;
-  } catch (error) {
-    console.error("Failed to fetch active peers:", error);
-    return [];
-  }
-};
-
-/**
- * Send a benefit to a receiver
- */
 export const initiateP2PTransfer = async (
-  senderId: string,
-  senderName: string,
-  receiverId: string,
-  benefit: { title: string; content: string; category: string; source: string }
+  _senderId: string,
+  _senderName: string,
+  _receiverId: string,
+  _benefit: { title: string; content: string; category: string; source: string }
 ): Promise<string> => {
   const transferId = `transfer-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-  const transferDoc: P2PTransfer = {
-    id: transferId,
-    senderId,
-    senderName,
-    receiverId,
-    benefitData: {
-      title: benefit.title,
-      content: benefit.content,
-      category: benefit.category,
-      source: benefit.source || ""
-    },
-    status: 'pending',
-    createdAt: Date.now()
-  };
-  await setDoc(doc(db, "p2p_transfers", transferId), transferDoc);
   return transferId;
 };
 
-/**
- * Accept a transfer
- */
-export const acceptP2PTransfer = async (transferId: string): Promise<void> => {
-  const transferDoc = doc(db, "p2p_transfers", transferId);
-  await updateDoc(transferDoc, { status: 'accepted' });
-};
+export const acceptP2PTransfer = async (_transferId: string): Promise<void> => {};
 
-/**
- * Decline a transfer
- */
-export const declineP2PTransfer = async (transferId: string): Promise<void> => {
-  const transferDoc = doc(db, "p2p_transfers", transferId);
-  await updateDoc(transferDoc, { status: 'declined' });
-};
+export const declineP2PTransfer = async (_transferId: string): Promise<void> => {};
 
-/**
- * Listen to incoming transfers targeting current peer
- * Querying by receiverId only avoids needing complex multi-field composite indexes.
- */
 export const listenToIncomingTransfers = (
-  myPeerId: string,
-  onNewTransfer: (transfer: P2PTransfer) => void
+  _myPeerId: string,
+  _onNewTransfer: (transfer: P2PTransfer) => void
 ): (() => void) => {
-  const transfersColl = collection(db, "p2p_transfers");
-  const q = query(
-    transfersColl,
-    where("receiverId", "==", myPeerId)
-  );
-  return onSnapshot(q, (snapshot) => {
-    snapshot.docChanges().forEach((change) => {
-      if (change.type === "added" || change.type === "modified") {
-        const data = change.doc.data() as P2PTransfer;
-        if (data.status === 'pending') {
-          onNewTransfer(data);
-        }
-      }
-    });
-  });
+  return () => {};
 };
 
-/**
- * Listen to a specific transfer's status updates (for the sender to monitor)
- */
 export const listenToTransferStatus = (
-  transferId: string,
-  onStatusChange: (status: 'pending' | 'accepted' | 'declined') => void
+  _transferId: string,
+  _onStatusChange: (status: 'pending' | 'accepted' | 'declined') => void
 ): (() => void) => {
-  const transferDoc = doc(db, "p2p_transfers", transferId);
-  return onSnapshot(transferDoc, (docSnap) => {
-    if (docSnap.exists()) {
-      const data = docSnap.data() as P2PTransfer;
-      onStatusChange(data.status);
-    }
-  });
+  return () => {};
 };
 
-/**
- * Delete a transfer record (cleanup)
- */
-export const deleteTransferRecord = async (transferId: string): Promise<void> => {
-  try {
-    const docRef = doc(db, "p2p_transfers", transferId);
-    await deleteDoc(docRef);
-  } catch (error) {
-    console.error("Failed to delete transfer record:", error);
-  }
-};
+export const deleteTransferRecord = async (_transferId: string): Promise<void> => {};

@@ -15,6 +15,7 @@ interface BenefitCardProps {
   onLocalShare?: (benefit: Benefit) => void;
   forceExpanded?: boolean;
   searchQuery?: string;
+  isFocused?: boolean;
 }
 
 // Helper to highlight matching text in yellow
@@ -69,6 +70,7 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
   onLocalShare,
   forceExpanded,
   searchQuery,
+  isFocused,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -76,10 +78,10 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
   const [showShareMenu, setShowShareMenu] = useState(false);
 
   React.useEffect(() => {
-    if (forceExpanded) {
+    if (forceExpanded || isFocused) {
       setIsExpanded(true);
     }
-  }, [forceExpanded]);
+  }, [forceExpanded, isFocused]);
 
   const handleCardClick = () => {
     if (!isExpanded) {
@@ -164,6 +166,8 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
         id={`benefit-card-${benefit.id}`}
         className={`bg-white rounded-2xl border border-zinc-200 cursor-pointer transition-all duration-300 custom-shadow hover:border-brand-cream text-right relative ${
           isExpanded ? 'border-brand-gold/40 ring-1 ring-brand-gold/15 !overflow-visible' : 'overflow-hidden'
+        } ${
+          isFocused ? 'z-50 ring-4 ring-brand-gold scale-[1.03] shadow-2xl !overflow-visible' : ''
         }`}
         onClick={handleCardClick}
       >
@@ -234,7 +238,7 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
                 className="!overflow-visible pt-2 border-t border-brand-cream/20 mt-3"
                 style={{ overflow: 'visible' }}
               >
-                <p className="text-base text-zinc-800 font-serif leading-loose whitespace-pre-line bg-brand-beige/40 p-4 rounded-xl border border-brand-cream/30 select-text">
+                <p className="text-base text-zinc-800 font-serif leading-loose whitespace-pre-line bg-brand-beige/40 p-4 rounded-xl border border-brand-cream/30 select-text max-h-80 sm:max-h-96 overflow-y-auto">
                   {highlightText(benefit.content, searchQuery)}
                 </p>
 

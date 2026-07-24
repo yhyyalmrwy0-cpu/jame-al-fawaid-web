@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { BookOpen, HelpCircle, FolderSync, PlusCircle, Search, Heart, SlidersHorizontal, Grid, Star, Sparkles, Layers, Eye, ArrowUp, X, Printer, Download, Smartphone, Folder, FolderPlus, Trash2, FolderMinus, Wifi, Bluetooth, Radio, Activity, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { BookOpen, HelpCircle, FolderSync, PlusCircle, Search, Heart, SlidersHorizontal, Grid, Star, Sparkles, Layers, Eye, ArrowUp, X, Printer, Download, Smartphone, Folder, FolderPlus, Trash2, FolderMinus, Wifi, Bluetooth, Radio, Activity, Loader2, CheckCircle, XCircle, ChevronDown } from 'lucide-react';
 
 // Import Types
 import { Benefit, ScientificQuery, AppSettings, CATEGORIES, CategoryType } from './types';
+
+// Import Search Engine
+import { searchBenefitsFTS, syncBenefitsFTS } from './lib/ftsEngine';
 
 // Import Components
 import { Header } from './components/Header';
@@ -37,7 +40,7 @@ import { ShareCardModal } from './components/ShareCardModal';
 import { PremiumPromoModal } from './components/PremiumPromoModal';
 import { WelcomeModal } from './components/WelcomeModal';
 import { getApiUrl } from './utils/api';
-import { getArabicSearchRegex, formatToHijriAndGregorian, normalizeArabicText } from './utils';
+import { getArabicSearchRegex, formatToHijriAndGregorian, normalizeArabicText, createBackupDataString, restoreControlPanelData } from './utils';
 
 // Initial Starter Data for visual polish and immediate functionality on load
 const STARTER_BENEFITS: Benefit[] = [
@@ -281,6 +284,7 @@ export default function App() {
   };
 
   const [expandedBenefitId, setExpandedBenefitId] = useState<string | null>(null);
+  const [focusedBenefitId, setFocusedBenefitId] = useState<string | null>(null);
   const [isControlPanelVisible, setIsControlPanelVisible] = useState<boolean>(() => {
     try {
       return localStorage.getItem('abuosid_control_panel_visible') === 'true';
@@ -291,13 +295,23 @@ export default function App() {
 
   // Core records state with localStorage loading
   const [benefits, setBenefits] = useState<Benefit[]>(() => {
-    const saved = localStorage.getItem('abuosid_benefits');
-    return saved ? JSON.parse(saved) : STARTER_BENEFITS;
+    try {
+      const saved = localStorage.getItem('abuosid_benefits');
+      return saved ? JSON.parse(saved) : STARTER_BENEFITS;
+    } catch (e) {
+      console.error('Error loading benefits from localStorage:', e);
+      return STARTER_BENEFITS;
+    }
   });
 
   const [queries, setQueries] = useState<ScientificQuery[]>(() => {
-    const saved = localStorage.getItem('abuosid_queries');
-    return saved ? JSON.parse(saved) : STARTER_QUERIES;
+    try {
+      const saved = localStorage.getItem('abuosid_queries');
+      return saved ? JSON.parse(saved) : STARTER_QUERIES;
+    } catch (e) {
+      console.error('Error loading queries from localStorage:', e);
+      return STARTER_QUERIES;
+    }
   });
 
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -345,11 +359,7 @@ export default function App() {
         return;
       }
 
-      const backupData = JSON.stringify({
-        benefits,
-        queries,
-        programmerName: settings.programmerName
-      });
+      const backupData = createBackupDataString(benefits, queries, settings.programmerName);
       const now = Date.now();
 
       // Load current history
@@ -477,11 +487,7 @@ export default function App() {
 
       if (settings.autoBackupInterval === 'on_exit') {
         try {
-          const backupData = JSON.stringify({
-            benefits,
-            queries,
-            programmerName: settings.programmerName
-          });
+          const backupData = createBackupDataString(benefits, queries, settings.programmerName);
           const existingHistoryStr = localStorage.getItem('abuosid_backups_history');
           let history = existingHistoryStr ? JSON.parse(existingHistoryStr) : [];
 
@@ -516,8 +522,53 @@ export default function App() {
 
   // UI state filters
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [isFullTextSearch, setIsFullTextSearch] = useState(false); // Toggle for full text body search
+  const [visibleCount, setVisibleCount] = useState(10); // Pagination / Lazy loading count (10 initially)
   const [selectedCategory, setSelectedCategory] = useState<string>('الكل');
   const [onlyFavorites, setOnlyFavorites] = useState(false);
+
+  // AbortController ref to cancel previous search execution when typing
+  const searchAbortControllerRef = React.useRef<AbortController | null>(null);
+
+  // 500ms Debounce search query with immediate cancellation (AbortController) to free memory/CPU
+  useEffect(() => {
+    // Reset pagination to 10 on new input
+    setVisibleCount(10);
+
+    if (searchAbortControllerRef.current) {
+      searchAbortControllerRef.current.abort();
+    }
+
+    const controller = new AbortController();
+    searchAbortControllerRef.current = controller;
+
+    if (!searchQuery.trim()) {
+      setDebouncedSearchQuery('');
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      if (!controller.signal.aborted) {
+        setDebouncedSearchQuery(searchQuery.trim());
+      }
+    }, 500);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [searchQuery]);
+
+  // Reset pagination when full text search toggle or category/favorite changes
+  useEffect(() => {
+    setVisibleCount(10);
+  }, [isFullTextSearch, selectedCategory, onlyFavorites]);
+
+  // Sync benefits with in-memory normalized cache
+  useEffect(() => {
+    syncBenefitsFTS(benefits);
+  }, [benefits]);
 
   // Dynamic custom categories state
   const [categories, setCategories] = useState<string[]>(() => {
@@ -537,12 +588,38 @@ export default function App() {
     }
   }, [categories]);
 
+  // Clear focused and expanded states when navigating away from the home feed
+  useEffect(() => {
+    if (activeTab !== 'home') {
+      setFocusedBenefitId(null);
+      setExpandedBenefitId(null);
+    }
+  }, [activeTab]);
+
   const [isAllCategoriesExpanded, setIsAllCategoriesExpanded] = useState(false);
   const [showCategoriesPopup, setShowCategoriesPopup] = useState(false);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [newCatName, setNewCatName] = useState('');
+  const [upgradeNoticeMessage, setUpgradeNoticeMessage] = useState<string | null>(null);
+
+  const handleOpenAddCategoryModal = () => {
+    if (!isAppActivated()) {
+      const notice = 'تنويه: إضافة أقسام جديدة ميزة خاصة بالنسخة المدفوعة. يرجى الترقية لفتح إمكانية إنشاء وتخصيص الأقسام بلا حدود.';
+      showToast(notice, 'warning');
+      setUpgradeNoticeMessage(notice);
+      return;
+    }
+    setShowAddCategoryModal(true);
+  };
 
   const handleAddCustomCategory = (name: string): boolean => {
+    if (!isAppActivated()) {
+      const notice = 'تنويه: إضافة أقسام جديدة ميزة خاصة بالنسخة المدفوعة. يرجى الترقية لفتح إمكانية إنشاء وتخصيص الأقسام بلا حدود.';
+      showToast(notice, 'warning');
+      setUpgradeNoticeMessage(notice);
+      setShowAddCategoryModal(false);
+      return false;
+    }
     const cleanName = name.trim();
     if (!cleanName) {
       showToast('يرجى إدخال اسم قسم صالح!', 'warning');
@@ -1059,29 +1136,55 @@ export default function App() {
 
   // Helper to scroll to a specific benefit, expand it, and highlight it
   const handleScrollToBenefit = (b: Benefit) => {
+    // Ensure we are on the home tab where the benefits are displayed
+    setActiveTab('home');
+
     // 1. Reset all filters to guarantee the card exists in the list
     setSearchQuery('');
+    setDebouncedSearchQuery('');
     setSelectedCategory('الكل');
     setOnlyFavorites(false);
     
-    // 2. Set this benefit ID to be expanded
+    // 2. Set this benefit ID to be expanded immediately so it takes its full size in layout
     setExpandedBenefitId(b.id);
     
     // 3. Mark it as viewed (increment views count)
     handleViewBenefit(b.id);
     
-    // 4. Scroll smoothly to the card with high contrast highlight effect
-    setTimeout(() => {
+    // 4. Poll the DOM immediately to find the element, wait a moment for the collapsing header to animate out,
+    // scroll smoothly to the element, and finally trigger the screen shading once it's centered!
+    let attempts = 0;
+    const maxAttempts = 40; // up to 2 seconds
+    const interval = setInterval(() => {
       const element = document.getElementById(`benefit-card-${b.id}`);
       if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        // Add a temporary glow-highlight ring around the card
-        element.classList.add('ring-4', 'ring-brand-gold', 'scale-[1.02]', 'duration-500');
+        clearInterval(interval);
+        
+        // Wait a short moment (200ms) for React state updates and the header layout shift to begin/stabilize
         setTimeout(() => {
-          element.classList.remove('ring-4', 'ring-brand-gold', 'scale-[1.02]');
-        }, 2000);
+          // Scroll smoothly to center
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          
+          // Once the smooth scroll is complete (smooth scroll takes around 750-800ms),
+          // activate the screen shading and highlight/focus state!
+          setTimeout(() => {
+            setFocusedBenefitId(b.id);
+            
+            // Add a temporary glow-highlight ring around the card
+            element.classList.add('ring-4', 'ring-brand-gold', 'scale-[1.03]', 'duration-500');
+            setTimeout(() => {
+              element.classList.remove('ring-4', 'ring-brand-gold', 'scale-[1.03]');
+            }, 3000);
+          }, 850);
+        }, 150);
+      } else {
+        attempts++;
+        if (attempts >= maxAttempts) {
+          clearInterval(interval);
+          console.warn(`Could not find element: benefit-card-${b.id} after 40 attempts.`);
+        }
       }
-    }, 150);
+    }, 50);
   };
 
   // 3. Toggle Favorite Status
@@ -1188,7 +1291,17 @@ export default function App() {
           });
         }
         
-        showToast('تم استرجاع النسخة الاحتياطية وتحديث السجلات بنجاح!', 'success');
+        // Restore dashboard/control panel state
+        restoreControlPanelData(parsed);
+        
+        showToast('تم استرجاع النسخة الاحتياطية وتحديث السجلات ولوحة التحكم بنجاح! جاري تحديث الصفحة...', 'success');
+        
+        setTimeout(() => {
+          if (typeof window !== 'undefined') {
+            window.location.reload();
+          }
+        }, 1500);
+        
         return true;
       }
     } catch (e) {
@@ -1208,31 +1321,37 @@ export default function App() {
     showToast('تم إرسال إشعار أندرويد منبثق! انظر أعلى الشاشة.', 'info');
   };
 
-  // 8. Filters for Home feed
-  const filteredBenefits = benefits.filter(b => {
-    let matchesSearch = true;
-    if (searchQuery.trim()) {
-      const normalizedQuery = normalizeArabicText(searchQuery);
-      if (normalizedQuery) {
-        const keywords = normalizedQuery.split(' ').filter(Boolean);
-        const bSearchContent = normalizeArabicText([
-          b.title,
-          b.content,
-          b.category,
-          b.source || '',
-          b.date,
-          formatToHijriAndGregorian(b.date)
-        ].join(' '));
-        
-        matchesSearch = keywords.every(kw => bSearchContent.includes(kw));
-      }
-    }
-    
-    const matchesCategory = selectedCategory === 'الكل' || b.category === selectedCategory;
-    const matchesFavorite = !onlyFavorites || b.isFavorite;
+  // 8. High-Performance Search (Lightweight, 500ms Debounce, 3-char threshold, Full-Text Toggle, Cancellation)
+  const filteredBenefits = useMemo(() => {
+    let result = benefits;
 
-    return matchesSearch && matchesCategory && matchesFavorite;
-  });
+    // Condition: Execute text search ONLY if query has at least 3 characters
+    if (debouncedSearchQuery.length >= 3) {
+      result = searchBenefitsFTS(
+        benefits,
+        {
+          query: debouncedSearchQuery,
+          isFullText: isFullTextSearch,
+        },
+        searchAbortControllerRef.current?.signal
+      );
+    }
+
+    // Apply Category & Favorites Filter
+    if (selectedCategory !== 'الكل') {
+      result = result.filter(b => b.category === selectedCategory);
+    }
+    if (onlyFavorites) {
+      result = result.filter(b => b.isFavorite);
+    }
+
+    return result;
+  }, [benefits, debouncedSearchQuery, isFullTextSearch, selectedCategory, onlyFavorites]);
+
+  // Paginated/Lazy Loaded subset (renders first 10 items initially for 60fps rendering)
+  const paginatedBenefits = useMemo(() => {
+    return filteredBenefits.slice(0, visibleCount);
+  }, [filteredBenefits, visibleCount]);
 
   return (
     <div className="min-h-screen bg-brand-beige flex flex-col pb-24 text-right">
@@ -1617,9 +1736,7 @@ export default function App() {
                           <motion.div
                             whileHover={{ scale: 1.02, y: -2 }}
                             whileTap={{ scale: 0.98 }}
-                            onClick={() => {
-                              setShowAddCategoryModal(true);
-                            }}
+                            onClick={handleOpenAddCategoryModal}
                             role="button"
                             tabIndex={0}
                             className="relative p-4 rounded-2xl rounded-tr-none border-2 border-dashed border-brand-emerald/20 hover:border-brand-emerald/40 bg-zinc-50/50 hover:bg-brand-cream/10 text-brand-emerald text-right transition-all flex flex-col justify-between h-28 cursor-pointer select-none"
@@ -1659,7 +1776,7 @@ export default function App() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="🔍 ابحث في عناوين الفوائد ومضامينها ومصادرها وتواريخها..."
+                    placeholder="🔍 ابحث في العناوين والوسوم والمصادر..."
                     className={`w-full pr-11 py-3 bg-white text-zinc-800 rounded-2xl border-2 border-brand-emerald/20 hover:border-brand-emerald/40 text-sm focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-sans shadow-md ${
                       searchQuery ? 'pl-11' : 'pl-4'
                     }`}
@@ -1684,11 +1801,44 @@ export default function App() {
                   )}
                 </div>
 
-                {searchQuery && (
+                {/* Search Options & Toggle Row */}
+                <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+                  {/* Full Text Search Toggle Button */}
+                  <label className="inline-flex items-center gap-2 text-xs font-bold text-zinc-700 bg-white px-3 py-1.5 rounded-xl border border-zinc-200/80 shadow-xs cursor-pointer select-none hover:bg-brand-cream/30 transition-all">
+                    <input
+                      type="checkbox"
+                      checked={isFullTextSearch}
+                      onChange={(e) => setIsFullTextSearch(e.target.checked)}
+                      className="w-4 h-4 text-brand-emerald rounded border-zinc-300 focus:ring-brand-emerald accent-brand-emerald cursor-pointer"
+                    />
+                    <span className="flex items-center gap-1.5">
+                      <span>بحث شامل في النصوص</span>
+                      {isFullTextSearch ? (
+                        <span className="text-[10px] bg-brand-gold/20 text-brand-gold-dark font-black px-1.5 py-0.5 rounded-md">
+                          مفعّل 📖
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-zinc-400 font-normal">
+                          (سريع: العناوين والوسوم والمصادر)
+                        </span>
+                      )}
+                    </span>
+                  </label>
+
+                  {/* Notice when typing less than 3 characters */}
+                  {searchQuery.trim().length > 0 && searchQuery.trim().length < 3 && (
+                    <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg animate-fade-in">
+                      ✏️ اكتب 3 حروف على الأقل لتشغيل البحث
+                    </span>
+                  )}
+                </div>
+
+                {/* Results count banner when valid search is active */}
+                {searchQuery.trim().length >= 3 && (
                   <motion.div
                     initial={{ opacity: 0, y: -5 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex items-center justify-between px-3 py-1 bg-brand-emerald/5 border border-brand-emerald/10 rounded-xl text-xs text-brand-emerald-dark font-sans"
+                    className="flex items-center justify-between px-3 py-1.5 bg-brand-emerald/5 border border-brand-emerald/10 rounded-xl text-xs text-brand-emerald-dark font-sans"
                   >
                     <div className="flex items-center gap-1.5 font-bold">
                       <span>تم العثور على</span>
@@ -1700,7 +1850,10 @@ export default function App() {
                           ? 'فائدة' 
                           : (filteredBenefits.length >= 3 && filteredBenefits.length <= 10) 
                             ? 'فوائد' 
-                            : 'فائدة'} مطابقة للبحث
+                            : 'فائدة'} مطابقة
+                      </span>
+                      <span className="text-[10px] text-brand-gold-dark bg-brand-gold/10 px-1.5 py-0.5 rounded-md mr-1">
+                        {isFullTextSearch ? 'بحث شامل' : 'بحث سريع'}
                       </span>
                     </div>
                     
@@ -1714,37 +1867,54 @@ export default function App() {
                 )}
               </div>
 
-              {/* Benefits Cards Feed List */}
+              {/* Benefits Cards Feed List with Pagination / Lazy Loading (10 items initially) */}
               <div className="space-y-4">
                 {filteredBenefits.length === 0 ? (
                   <div className="text-center py-16 bg-white border border-dashed border-zinc-200 rounded-3xl p-6 custom-shadow">
                     <BookOpen className="w-14 h-14 text-zinc-300 mx-auto mb-4" />
                     <h3 className="text-base font-bold text-zinc-700 font-sans">لا توجد فوائد مطابقة للبحث</h3>
                     <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto leading-relaxed">
-                      لم نجد أي فائدة مطابقة لشروط التصفية أو البحث. جرب كتابة كلمات مفتاحية أخرى، أو قم بإعادة تعيين فلاتر التصفية.
+                      لم نجد أي فائدة مطابقة لشروط التصفية أو البحث. جرب كتابة كلمات مفتاحية أخرى، أو قم بتفعيل خيار "بحث شامل في النصوص".
                     </p>
                   </div>
                 ) : (
-                  filteredBenefits.map((benefit) => (
-                    <BenefitCard
-                      key={benefit.id}
-                      benefit={benefit}
-                      onView={handleViewBenefit}
-                      onToggleFavorite={handleToggleFavorite}
-                      onEdit={(b) => {
-                        setEditingBenefit(b);
-                        setPrefilledBenefit(null);
-                        setConvertingQueryId(null);
-                        setActiveTab('add');
-                      }}
-                      onDelete={handleDeleteBenefit}
-                      showToast={showToast}
-                      onOpenShareCard={(b) => setSharingBenefit(b)}
-                      onLocalShare={(b) => setSharingP2PBenefit(b)}
-                      forceExpanded={expandedBenefitId === benefit.id}
-                      searchQuery={searchQuery}
-                    />
-                  ))
+                  <>
+                    {paginatedBenefits.map((benefit) => (
+                      <BenefitCard
+                        key={benefit.id}
+                        benefit={benefit}
+                        onView={handleViewBenefit}
+                        onToggleFavorite={handleToggleFavorite}
+                        onEdit={(b) => {
+                          setEditingBenefit(b);
+                          setPrefilledBenefit(null);
+                          setConvertingQueryId(null);
+                          setActiveTab('add');
+                        }}
+                        onDelete={handleDeleteBenefit}
+                        showToast={showToast}
+                        onOpenShareCard={(b) => setSharingBenefit(b)}
+                        onLocalShare={(b) => setSharingP2PBenefit(b)}
+                        forceExpanded={expandedBenefitId === benefit.id}
+                        isFocused={focusedBenefitId === benefit.id}
+                        searchQuery={debouncedSearchQuery.length >= 3 ? debouncedSearchQuery : ''}
+                      />
+                    ))}
+
+                    {/* Pagination / Lazy Loading Button if total results exceed visibleCount */}
+                    {filteredBenefits.length > visibleCount && (
+                      <div className="text-center pt-4 pb-2">
+                        <button
+                          type="button"
+                          onClick={() => setVisibleCount(prev => prev + 10)}
+                          className="inline-flex items-center gap-2 px-6 py-3 bg-brand-emerald text-white hover:bg-brand-emerald-dark font-bold text-xs sm:text-sm rounded-2xl transition-all shadow-md hover:shadow-lg cursor-pointer active:scale-95"
+                        >
+                          <span>عرض المزيد من الفوائد ({filteredBenefits.length - visibleCount} متبقية)</span>
+                          <ChevronDown className="w-4 h-4 animate-bounce" />
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </motion.div>
@@ -1974,9 +2144,13 @@ export default function App() {
 
       {/* Premium Promo Modal (Paywall Details list) */}
       <PremiumPromoModal
-        isOpen={showPremiumPromo}
-        onClose={() => setShowPremiumPromo(false)}
+        isOpen={showPremiumPromo || !!upgradeNoticeMessage}
+        onClose={() => {
+          setShowPremiumPromo(false);
+          setUpgradeNoticeMessage(null);
+        }}
         showToast={showToast}
+        noticeMessage={upgradeNoticeMessage || undefined}
       />
 
       {/* Welcome Modal Popup */}
@@ -2361,6 +2535,21 @@ export default function App() {
       >
         <Search className="w-5.5 h-5.5 text-brand-emerald" />
       </motion.button>
+
+      {/* Screen Shading / Dimming Overlay for focused benefit */}
+      <AnimatePresence>
+        {focusedBenefitId && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            onClick={() => setFocusedBenefitId(null)}
+            className="fixed inset-0 bg-black/65 backdrop-blur-[2px] z-40 cursor-pointer flex items-center justify-center"
+            title="انقر في أي مكان لإلغاء التظليل"
+          />
+        )}
+      </AnimatePresence>
 
     </div>
   );

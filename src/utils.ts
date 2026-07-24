@@ -1258,3 +1258,77 @@ export function getHighlightSpans(originalText: string, query: string): { start:
   return merged;
 }
 
+/**
+ * Creates a comprehensive backup data string containing benefits, queries, programmer name,
+ * and all associated dashboard / control panel settings and statistics.
+ */
+export function createBackupDataString(benefits: any[], queries: any[], programmerName: string): string {
+  let controlPanelData: any = {};
+  if (typeof window !== 'undefined') {
+    try {
+      controlPanelData = {
+        localAdminPassword: localStorage.getItem('abuosid_local_admin_password') || undefined,
+        adminKeysList: localStorage.getItem('abuosid_admin_keys_list') ? JSON.parse(localStorage.getItem('abuosid_admin_keys_list')!) : undefined,
+        adminStats: localStorage.getItem('abuosid_admin_stats') ? JSON.parse(localStorage.getItem('abuosid_admin_stats')!) : undefined,
+        controlPanelVisible: localStorage.getItem('abuosid_control_panel_visible') === 'true',
+        appActivated: localStorage.getItem('abuosid_app_activated') === 'true',
+        activationKey: localStorage.getItem('abuosid_activation_key') || undefined,
+        deviceSeed: localStorage.getItem('abuosid_device_seed') || undefined,
+        freePdfCount: localStorage.getItem('abuosid_free_pdf_count') ? parseInt(localStorage.getItem('abuosid_free_pdf_count')!, 10) : undefined,
+        ocrFreeUsesCount: localStorage.getItem('abuosid_ocr_free_uses_count') ? parseInt(localStorage.getItem('abuosid_ocr_free_uses_count')!, 10) : undefined
+      };
+    } catch (e) {
+      console.error("Failed to read control panel values from localStorage for backup:", e);
+    }
+  }
+
+  return JSON.stringify({
+    benefits,
+    queries,
+    programmerName,
+    controlPanel: controlPanelData
+  }, null, 2);
+}
+
+/**
+ * Restores dashboard / control panel states back to localStorage if present in the backup.
+ */
+export function restoreControlPanelData(parsedBackup: any): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (parsedBackup && parsedBackup.controlPanel) {
+      const cp = parsedBackup.controlPanel;
+      if (cp.localAdminPassword !== undefined) {
+        localStorage.setItem('abuosid_local_admin_password', cp.localAdminPassword);
+      }
+      if (cp.adminKeysList !== undefined) {
+        localStorage.setItem('abuosid_admin_keys_list', JSON.stringify(cp.adminKeysList));
+      }
+      if (cp.adminStats !== undefined) {
+        localStorage.setItem('abuosid_admin_stats', JSON.stringify(cp.adminStats));
+      }
+      if (cp.controlPanelVisible !== undefined) {
+        localStorage.setItem('abuosid_control_panel_visible', String(cp.controlPanelVisible));
+      }
+      if (cp.appActivated !== undefined) {
+        localStorage.setItem('abuosid_app_activated', String(cp.appActivated));
+      }
+      if (cp.activationKey !== undefined) {
+        localStorage.setItem('abuosid_activation_key', cp.activationKey);
+      }
+      if (cp.deviceSeed !== undefined) {
+        localStorage.setItem('abuosid_device_seed', cp.deviceSeed);
+      }
+      if (cp.freePdfCount !== undefined) {
+        localStorage.setItem('abuosid_free_pdf_count', String(cp.freePdfCount));
+      }
+      if (cp.ocrFreeUsesCount !== undefined) {
+        localStorage.setItem('abuosid_ocr_free_uses_count', String(cp.ocrFreeUsesCount));
+      }
+    }
+  } catch (e) {
+    console.error("Failed to restore control panel values to localStorage from backup:", e);
+  }
+}
+
+

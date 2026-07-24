@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Save, Mic, MicOff, BookOpen, Tag, Calendar, Sparkles, RefreshCw, Layers, Camera, Loader2, Image } from 'lucide-react';
-import { Benefit, CATEGORIES, CategoryType } from '../types';
+import { Save, Mic, MicOff, BookOpen, Tag, Calendar, Sparkles, Layers, Camera, Loader2, Image, Check, X } from 'lucide-react';
+import { Benefit, CATEGORIES } from '../types';
 import { PremiumPromoModal } from './PremiumPromoModal';
 import { getApiUrl } from '../utils/api';
 
@@ -112,11 +112,113 @@ export const BenefitForm: React.FC<BenefitFormProps> = ({
   const [date, setDate] = useState('');
   const [saveAndContinue, setSaveAndContinue] = useState(false);
 
+  // Auto-resizing textarea ref
+  const contentRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-grow textarea height dynamically as content grows (capped between 180px and 280px with scrollbar)
+  useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.style.height = '180px';
+      const scrollH = contentRef.current.scrollHeight;
+      contentRef.current.style.height = `${Math.min(280, Math.max(180, scrollH))}px`;
+    }
+  }, [content]);
+
+  // Saved sources history and autocomplete
+  const [savedSources, setSavedSources] = useState<string[]>([]);
+  const [showSourceSuggestions, setShowSourceSuggestions] = useState(false);
+  const sourceContainerRef = useRef<HTMLDivElement>(null);
+
+  const getSavedSources = (): string[] => {
+    const set = new Set<string>();
+    try {
+      const customSourcesStr = localStorage.getItem('abuosid_saved_sources');
+      if (customSourcesStr) {
+        const parsed = JSON.parse(customSourcesStr);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((s) => {
+            if (typeof s === 'string' && s.trim()) set.add(s.trim());
+          });
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
+    try {
+      const savedBenefitsStr = localStorage.getItem('abuosid_benefits');
+      if (savedBenefitsStr) {
+        const parsed = JSON.parse(savedBenefitsStr);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((b: any) => {
+            if (b && typeof b.source === 'string' && b.source.trim()) {
+              set.add(b.source.trim());
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
+    return Array.from(set);
+  };
+
+  useEffect(() => {
+    setSavedSources(getSavedSources());
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (sourceContainerRef.current && !sourceContainerRef.current.contains(event.target as Node)) {
+        setShowSourceSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleDeleteSavedSource = (e: React.MouseEvent, srcToDelete: string) => {
+    e.stopPropagation();
+    const updated = savedSources.filter((s) => s !== srcToDelete);
+    setSavedSources(updated);
+    try {
+      localStorage.setItem('abuosid_saved_sources', JSON.stringify(updated));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const filteredSources = savedSources.filter(
+    (s) => !source.trim() || s.toLowerCase().includes(source.trim().toLowerCase())
+  );
+
+  // Free tier constants & activation checks
+  const MAX_FREE_CHAR_LIMIT = 12000; // 12,000 characters limit for free version
+  const isAppActivated = typeof window !== 'undefined' && localStorage.getItem('abuosid_app_activated') === 'true';
+  const [upgradeNoticeMessage, setUpgradeNoticeMessage] = useState<string | null>(null);
+
   // Custom Category creation inline states
   const [showAddCategoryInput, setShowAddCategoryInput] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
 
+  const handleToggleAddCategoryInput = () => {
+    if (!isAppActivated) {
+      const msg = 'تنويه: إضافة أقسام جديدة ميزة خاصة بالنسخة المدفوعة. يرجى الترقية لفتح إمكانية إنشاء وتخصيص الأقسام بلا حدود.';
+      showToast(msg, 'warning');
+      setUpgradeNoticeMessage(msg);
+      return;
+    }
+    setShowAddCategoryInput(!showAddCategoryInput);
+  };
+
   const handleCreateCategory = () => {
+    if (!isAppActivated) {
+      const msg = 'تنويه: إضافة أقسام جديدة ميزة خاصة بالنسخة المدفوعة. يرجى الترقية لفتح إمكانية إنشاء وتخصيص الأقسام بلا حدود.';
+      showToast(msg, 'warning');
+      setUpgradeNoticeMessage(msg);
+      return;
+    }
     const cleanName = newCategoryName.trim();
     if (!cleanName) {
       showToast('يرجى إدخال اسم فئة/قسم صالح!', 'warning');
@@ -290,12 +392,12 @@ export const BenefitForm: React.FC<BenefitFormProps> = ({
     }
   }, [initialBenefit, prefilledData]);
 
-  // Set up Speech Recognition
+  // Set up Speech Recognition with Continuous Recording
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
       const rec = new SpeechRecognition();
-      rec.continuous = false;
+      rec.continuous = true;
       rec.lang = 'ar-SA'; // Set Arabic language recognition
       rec.interimResults = false;
       rec.maxAlternatives = 1;
@@ -363,6 +465,29 @@ export const BenefitForm: React.FC<BenefitFormProps> = ({
     if (!content.trim()) {
       showToast('يرجى كتابة نص الفائدة قبل الحفظ!', 'warning');
       return;
+    }
+
+    // Check Free Tier character limit (12,000 characters)
+    if (!isAppActivated && content.trim().length > MAX_FREE_CHAR_LIMIT) {
+      const msg = 'تنويه: لقد تجاوزت الحد المسموح به في النسخة المجانية (12,000 حرف). للحصول على سعة لا محدودة لنصوص الفوائد، يرجى الترقية للنسخة المدفوعة.';
+      showToast(msg, 'warning');
+      setUpgradeNoticeMessage(msg);
+      return;
+    }
+
+    // Save source to history for future autocomplete suggestions
+    if (source.trim()) {
+      const trimmedSource = source.trim();
+      try {
+        const existing = getSavedSources();
+        if (!existing.includes(trimmedSource)) {
+          const updated = [trimmedSource, ...existing].slice(0, 50);
+          localStorage.setItem('abuosid_saved_sources', JSON.stringify(updated));
+          setSavedSources(updated);
+        }
+      } catch (err) {
+        console.error(err);
+      }
     }
 
     // Save the benefit
@@ -450,14 +575,14 @@ export const BenefitForm: React.FC<BenefitFormProps> = ({
 
         {/* Content Field with Voice Input & Smart OCR Camera */}
         <div className="space-y-1.5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-2">
             <label className="text-sm font-bold text-zinc-700 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-brand-gold" />
               نص الفائدة العلمية بالتفصيل *
             </label>
             
-            {/* Elegant Single OCR Button */}
             <div className="flex items-center gap-2">
+              {/* Elegant Single OCR Button */}
               <button
                 type="button"
                 onClick={handleOpenOcrMenu}
@@ -500,27 +625,47 @@ export const BenefitForm: React.FC<BenefitFormProps> = ({
             </div>
           )}
 
-          <div className="relative">
+          {/* Main Dynamic Textarea with Fixed Max Height & Internal Vertical Scrollbar */}
+          <div className="relative group">
             <textarea
+              ref={contentRef}
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="قيد الفائدة العلمية هنا بسرد كثيف وغني..."
-              rows={6}
-              className="w-full pr-4 pl-12 py-3 rounded-xl border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-serif text-base text-zinc-800 bg-zinc-50/50 leading-relaxed"
+              placeholder="اكتب الفائدة العلمية بالتفصيل هنا..."
+              style={{ minHeight: '180px', maxHeight: '280px' }}
+              className="w-full pr-4 pl-12 pt-3 pb-10 rounded-xl border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-serif text-base text-zinc-800 bg-zinc-50/50 leading-relaxed resize-y overflow-y-auto"
             />
-            {/* Mic button */}
+
+            {/* Voice Mic Button */}
             <button
               type="button"
               onClick={() => startVoiceInput('content')}
-              className={`absolute left-3 bottom-3 p-2 rounded-lg transition-all flex items-center justify-center ${
+              className={`absolute left-3 bottom-10 p-2 rounded-lg transition-all flex items-center justify-center cursor-pointer ${
                 isListeningContent
                   ? 'bg-red-500 text-white animate-pulse'
                   : 'text-zinc-400 hover:text-brand-emerald hover:bg-zinc-100'
               }`}
-              title="إدخال بالنص صوتياً"
+              title="إدخال بالنص صوتياً (تسجيل مستمر)"
             >
               {isListeningContent ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
             </button>
+
+            {/* Character counter & Free Tier Limit Status */}
+            <div className="flex items-center justify-between text-xs pt-1.5 px-1 font-sans">
+              <span className={`text-[11px] ${!isAppActivated && content.length > MAX_FREE_CHAR_LIMIT ? 'text-red-600 font-bold' : 'text-zinc-500 font-medium'}`}>
+                عدد الحروف: <span className="font-bold">{content.length.toLocaleString()}</span> {!isAppActivated ? `/ 12,000 حرف (حد النسخة المجانية)` : `حرف (النسخة المدفوعة: سعة لا محدودة ✨)`}
+              </span>
+              {!isAppActivated && content.length > MAX_FREE_CHAR_LIMIT && (
+                <button
+                  type="button"
+                  onClick={() => setUpgradeNoticeMessage('تنويه: لقد تجاوزت الحد المسموح به في النسخة المجانية (12,000 حرف). للحصول على سعة لا محدودة لنصوص الفوائد، يرجى الترقية للنسخة المدفوعة.')}
+                  className="text-[11px] text-brand-emerald font-bold hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  <span>تجاوزت الحد! ترقية الحساب</span>
+                  <Sparkles className="w-3.5 h-3.5 text-brand-gold animate-pulse" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -536,7 +681,7 @@ export const BenefitForm: React.FC<BenefitFormProps> = ({
               {onAddCustomCategory && (
                 <button
                   type="button"
-                  onClick={() => setShowAddCategoryInput(!showAddCategoryInput)}
+                  onClick={handleToggleAddCategoryInput}
                   className="text-xs font-bold text-brand-emerald hover:text-brand-emerald-dark hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   {showAddCategoryInput ? '✕ إلغاء' : '+ إضافة قسم جديد'}
@@ -582,19 +727,80 @@ export const BenefitForm: React.FC<BenefitFormProps> = ({
             )}
           </div>
 
-          {/* Source Input */}
-          <div className="space-y-1.5">
+          {/* Source Input with Autocomplete & History Suggestions */}
+          <div className="space-y-1.5 relative" ref={sourceContainerRef}>
             <label className="text-sm font-bold text-zinc-700 flex items-center gap-1.5">
               <BookOpen className="w-4 h-4 text-brand-gold" />
               المصدر (الكتاب والمؤلف)
             </label>
-            <input
-              type="text"
-              value={source}
-              onChange={(e) => setSource(e.target.value)}
-              placeholder="مثال: الفتاوى الكبرى لابن تيمية - ج٣ ص١٥"
-              className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-sans text-sm text-zinc-800 bg-zinc-50/50"
-            />
+
+            <div className="relative">
+              <input
+                type="text"
+                value={source}
+                onChange={(e) => {
+                  setSource(e.target.value);
+                  setShowSourceSuggestions(true);
+                }}
+                onFocus={() => setShowSourceSuggestions(true)}
+                placeholder="مثال: الفتاوى الكبرى لابن تيمية - ج٣ ص١٥"
+                list="saved-sources-datalist"
+                className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-sans text-sm text-zinc-800 bg-zinc-50/50"
+              />
+
+              {/* Native Datalist for automatic browser suggestions */}
+              <datalist id="saved-sources-datalist">
+                {savedSources.map((s, idx) => (
+                  <option key={idx} value={s} />
+                ))}
+              </datalist>
+
+              {/* Custom Dropdown Menu for Arabic Autocomplete Selection */}
+              <AnimatePresence>
+                {showSourceSuggestions && filteredSources.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 5 }}
+                    className="absolute z-30 top-full right-0 left-0 mt-1 bg-white border border-brand-cream rounded-xl shadow-xl max-h-56 overflow-y-auto divide-y divide-zinc-100"
+                  >
+                    <div className="px-3 py-1.5 bg-brand-cream/20 text-[11px] font-bold text-brand-emerald-dark flex justify-between items-center">
+                      <span>المصادر المحفوظة سابقاً (انقر للاختيار التلقائي):</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowSourceSuggestions(false)}
+                        className="text-zinc-400 hover:text-zinc-600 p-0.5 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    {filteredSources.map((srcItem, index) => (
+                      <div
+                        key={index}
+                        onClick={() => {
+                          setSource(srcItem);
+                          setShowSourceSuggestions(false);
+                        }}
+                        className="px-3.5 py-2.5 text-xs text-zinc-800 hover:bg-brand-cream/30 cursor-pointer flex items-center justify-between transition-colors group"
+                      >
+                        <span className="font-serif font-medium truncate flex items-center gap-2">
+                          <BookOpen className="w-3.5 h-3.5 text-brand-gold shrink-0" />
+                          <span>{srcItem}</span>
+                        </span>
+                        <button
+                          type="button"
+                          title="حذف من السجل"
+                          onClick={(e) => handleDeleteSavedSource(e, srcItem)}
+                          className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-red-600 p-1 rounded transition-all cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
 
@@ -715,9 +921,13 @@ export const BenefitForm: React.FC<BenefitFormProps> = ({
 
       {/* Premium Upgrade Modal */}
       <PremiumPromoModal
-        isOpen={isPremiumModalOpen}
-        onClose={() => setIsPremiumModalOpen(false)}
+        isOpen={isPremiumModalOpen || !!upgradeNoticeMessage}
+        onClose={() => {
+          setIsPremiumModalOpen(false);
+          setUpgradeNoticeMessage(null);
+        }}
         showToast={showToast}
+        noticeMessage={upgradeNoticeMessage || undefined}
       />
     </div>
   );

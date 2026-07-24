@@ -31,12 +31,14 @@ interface PremiumPromoModalProps {
   isOpen: boolean;
   onClose: () => void;
   showToast: (msg: string, type: 'success' | 'info' | 'warning') => void;
+  noticeMessage?: string;
 }
 
 export const PremiumPromoModal: React.FC<PremiumPromoModalProps> = ({
   isOpen,
   onClose,
   showToast,
+  noticeMessage,
 }) => {
   if (!isOpen) return null;
 
@@ -87,6 +89,22 @@ export const PremiumPromoModal: React.FC<PremiumPromoModalProps> = ({
           </div>
 
           <div className="p-6 space-y-6 overflow-y-auto flex-1">
+            {/* Prominent Upgrade Notice Banner if triggered by a limit feature */}
+            {noticeMessage && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-amber-50 border-2 border-amber-300/80 rounded-2xl flex items-start gap-3 text-amber-950 font-sans shadow-xs"
+              >
+                <div className="p-2 bg-amber-500/15 text-amber-700 rounded-xl shrink-0 mt-0.5">
+                  <Sparkles className="w-5 h-5 text-amber-600 animate-bounce" />
+                </div>
+                <div className="text-xs sm:text-sm font-bold leading-relaxed text-right flex-1">
+                  {noticeMessage}
+                </div>
+              </motion.div>
+            )}
+
             <p className="text-xs text-zinc-600 leading-relaxed font-semibold">
               شكرًا لاهتمامك ببرنامج <span className="text-brand-emerald font-bold">جامع الفوائد</span>! الترقية للنسخة الاحترافية تدعم استمرار تطوير التطبيق وتفتح لك باقة من المزايا الحصرية المصممة لطلاب العلم والباحثين:
             </p>

@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Download, Upload, Cloud, RefreshCw, Bell, User, Mail, ShieldCheck, ExternalLink, HelpCircle, Check, AlertTriangle, Play, Smartphone, Copy, Key, Lock, Unlock, Trash2, FolderPlus, FolderSync, X, Wifi, Bluetooth, Radio, Activity, CheckCircle, XCircle } from 'lucide-react';
 import { AppSettings, Benefit, ScientificQuery, CATEGORIES } from '../types';
-import { exportBenefitsToPDF, formatToHijriAndGregorian } from '../utils';
+import { exportBenefitsToPDF, formatToHijriAndGregorian, createBackupDataString } from '../utils';
 import { 
   listGoogleDriveBackups, 
   uploadToGoogleDrive, 
@@ -839,7 +839,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const handleExportLocal = () => {
     try {
-      const dataStr = JSON.stringify({ benefits, queries, programmerName: settings.programmerName }, null, 2);
+      const dataStr = createBackupDataString(benefits, queries, settings.programmerName || '');
       const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
       
       const exportFileDefaultName = `فوائد_أبي_أسيد_احتياطي_${new Date().toISOString().split('T')[0]}.json`;
@@ -896,7 +896,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       setIsDriveSyncing(true);
       showToast('جاري رفع نسختك الاحتياطية مباشرة إلى جوجل درايف السحابي... ☁️', 'info');
       try {
-        const backupData = JSON.stringify({ benefits, queries, programmerName: settings.programmerName });
+        const backupData = createBackupDataString(benefits, queries, settings.programmerName || '');
         await uploadToGoogleDrive(googleToken, backupData, 'manual', benefits.length, queries.length);
         
         const now = new Date();

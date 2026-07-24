@@ -29,6 +29,27 @@ export const Header: React.FC<HeaderProps> = ({
   const [editedName, setEditedName] = useState(settings.programmerName);
   const [isDailyBenefitHidden, setIsDailyBenefitHidden] = useState(false);
 
+  // Sync isDailyBenefitHidden with localStorage whenever randomBenefit changes
+  useEffect(() => {
+    if (randomBenefit) {
+      const isHidden = localStorage.getItem(`abuosid_daily_benefit_hidden_${randomBenefit.id}`) === 'true';
+      setIsDailyBenefitHidden(isHidden);
+    } else {
+      setIsDailyBenefitHidden(false);
+    }
+  }, [randomBenefit]);
+
+  const handleHideDailyBenefit = (hidden: boolean) => {
+    setIsDailyBenefitHidden(hidden);
+    if (randomBenefit) {
+      if (hidden) {
+        localStorage.setItem(`abuosid_daily_benefit_hidden_${randomBenefit.id}`, 'true');
+      } else {
+        localStorage.removeItem(`abuosid_daily_benefit_hidden_${randomBenefit.id}`);
+      }
+    }
+  };
+
   const [isHolding, setIsHolding] = useState(false);
   const timerRef = React.useRef<NodeJS.Timeout | null>(null);
   const intervalRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -105,6 +126,12 @@ export const Header: React.FC<HeaderProps> = ({
       if (unshownBenefits.length === 0) {
         shownIds = [];
         unshownBenefits = [...benefits];
+        // Clear all stored hidden states when the cycle completes
+        benefits.forEach(b => {
+          try {
+            localStorage.removeItem(`abuosid_daily_benefit_hidden_${b.id}`);
+          } catch (e) {}
+        });
       }
 
       // Pick a random benefit from the unshown ones
@@ -293,7 +320,7 @@ export const Header: React.FC<HeaderProps> = ({
               transition={{ duration: 0.3 }}
               onClick={() => {
                 selectRandomBenefit();
-                setIsDailyBenefitHidden(false);
+                handleHideDailyBenefit(false);
               }}
               className="w-full bg-gradient-to-r from-brand-emerald-dark to-brand-emerald text-white hover:text-brand-cream font-extrabold py-4 px-6 rounded-2xl border border-brand-gold/25 flex items-center justify-center gap-3 shadow-md hover:shadow-lg active:scale-[0.99] transition-all duration-200 cursor-pointer font-sans"
             >
@@ -310,7 +337,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="bg-gradient-to-br from-brand-beige to-[#FBF9F3] border-r-4 border-brand-emerald border-y border-l border-brand-emerald/15 rounded-2xl p-6 custom-shadow-gold relative overflow-hidden cursor-pointer hover:border-brand-emerald/30 hover:shadow-lg transition-all duration-300 group"
               onClick={() => {
                 onViewBenefit(randomBenefit);
-                setIsDailyBenefitHidden(true);
+                handleHideDailyBenefit(true);
               }}
             >
               {/* Elegant Background Islamic star and ornament */}
