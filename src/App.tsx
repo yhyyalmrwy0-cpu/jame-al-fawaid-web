@@ -39,6 +39,7 @@ import {
 import { ShareCardModal } from './components/ShareCardModal';
 import { PremiumPromoModal } from './components/PremiumPromoModal';
 import { WelcomeModal } from './components/WelcomeModal';
+import { BenefitDetailModal } from './components/BenefitDetailModal';
 import { getApiUrl } from './utils/api';
 import { getArabicSearchRegex, formatToHijriAndGregorian, normalizeArabicText, createBackupDataString, restoreControlPanelData } from './utils';
 
@@ -293,24 +294,36 @@ export default function App() {
     }
   });
 
+  // Helper to deduplicate array by id
+  const deduplicateById = <T extends { id: string }>(items: T[]): T[] => {
+    const seen = new Set<string>();
+    return items.filter(item => {
+      if (!item.id || seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  };
+
   // Core records state with localStorage loading
   const [benefits, setBenefits] = useState<Benefit[]>(() => {
     try {
       const saved = localStorage.getItem('abuosid_benefits');
-      return saved ? JSON.parse(saved) : STARTER_BENEFITS;
+      const loaded = saved ? JSON.parse(saved) : STARTER_BENEFITS;
+      return deduplicateById(loaded);
     } catch (e) {
       console.error('Error loading benefits from localStorage:', e);
-      return STARTER_BENEFITS;
+      return deduplicateById(STARTER_BENEFITS);
     }
   });
 
   const [queries, setQueries] = useState<ScientificQuery[]>(() => {
     try {
       const saved = localStorage.getItem('abuosid_queries');
-      return saved ? JSON.parse(saved) : STARTER_QUERIES;
+      const loaded = saved ? JSON.parse(saved) : STARTER_QUERIES;
+      return deduplicateById(loaded);
     } catch (e) {
       console.error('Error loading queries from localStorage:', e);
-      return STARTER_QUERIES;
+      return deduplicateById(STARTER_QUERIES);
     }
   });
 
@@ -527,6 +540,7 @@ export default function App() {
   const [visibleCount, setVisibleCount] = useState(10); // Pagination / Lazy loading count (10 initially)
   const [selectedCategory, setSelectedCategory] = useState<string>('الكل');
   const [onlyFavorites, setOnlyFavorites] = useState(false);
+  const [modalPopupBenefit, setModalPopupBenefit] = useState<Benefit | null>(null);
 
   // AbortController ref to cancel previous search execution when typing
   const searchAbortControllerRef = React.useRef<AbortController | null>(null);
@@ -574,9 +588,10 @@ export default function App() {
   const [categories, setCategories] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('abuosid_custom_categories_list_v1');
-      return saved ? JSON.parse(saved) : [...CATEGORIES];
+      const loaded = saved ? JSON.parse(saved) : [...CATEGORIES];
+      return Array.from(new Set(loaded.filter(Boolean)));
     } catch (e) {
-      return [...CATEGORIES];
+      return Array.from(new Set([...CATEGORIES]));
     }
   });
 
@@ -1134,43 +1149,76 @@ export default function App() {
     setBenefits(prev => prev.map(b => b.id === id ? { ...b, views: b.views + 1 } : b));
   };
 
-  // Helper to scroll to a specific benefit, expand it, and highlight it
+  // Helper to scroll to a specific benefit if visible, or show in popup modal if not in active visible list
   const handleScrollToBenefit = (b: Benefit) => {
-    // Ensure we are on the home tab where the benefits are displayed
+    // Check if benefit b is currently present in the visible paginated list
+    const isCurrentlyVisibleInFeed = activeTab === 'home' && paginatedBenefits.some(item => item.id === b.id);
+
+    if (isCurrentlyVisibleInFeed) {
+      // 1. If currently visible in the active feed list: scroll down to it smoothly and expand/focus it
+      setActiveTab('home');
+      setExpandedBenefitId(b.id);
+      handleViewBenefit(b.id);
+      
+      let attempts = 0;
+      const maxAttempts = 30;
+      const interval = setInterval(() => {
+        const element = document.getElementById(`benefit-card-${b.id}`);
+        if (element) {
+          clearInterval(interval);
+          setTimeout(() => {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => {
+              setFocusedBenefitId(b.id);
+              element.classList.add('ring-4', 'ring-brand-gold', 'scale-[1.03]', 'duration-500');
+              setTimeout(() => {
+                element.classList.remove('ring-4', 'ring-brand-gold', 'scale-[1.03]');
+              }, 3000);
+            }, 850);
+          }, 150);
+        } else {
+          attempts++;
+          if (attempts >= maxAttempts) {
+            clearInterval(interval);
+          }
+        }
+      }, 50);
+    } else {
+      // 2. If NOT currently in the visible feed list (beyond page limit or filtered out): display in Pop-up Modal!
+      setModalPopupBenefit(b);
+      handleViewBenefit(b.id);
+    }
+  };
+
+  // Helper to jump from Pop-up Modal to the main list feed by expanding pagination if needed
+  const handleJumpFromModalToList = (b: Benefit) => {
+    setModalPopupBenefit(null);
     setActiveTab('home');
 
-    // 1. Reset all filters to guarantee the card exists in the list
+    // Reset filters to ensure benefit is present in list
     setSearchQuery('');
     setDebouncedSearchQuery('');
     setSelectedCategory('الكل');
     setOnlyFavorites(false);
-    
-    // 2. Set this benefit ID to be expanded immediately so it takes its full size in layout
+
+    // Find index of benefit in main list
+    const index = benefits.findIndex(item => item.id === b.id);
+    if (index !== -1) {
+      // Expand pagination count so this card is rendered
+      setVisibleCount(prev => Math.max(prev, index + 5));
+    }
+
     setExpandedBenefitId(b.id);
-    
-    // 3. Mark it as viewed (increment views count)
-    handleViewBenefit(b.id);
-    
-    // 4. Poll the DOM immediately to find the element, wait a moment for the collapsing header to animate out,
-    // scroll smoothly to the element, and finally trigger the screen shading once it's centered!
+
     let attempts = 0;
-    const maxAttempts = 40; // up to 2 seconds
     const interval = setInterval(() => {
       const element = document.getElementById(`benefit-card-${b.id}`);
       if (element) {
         clearInterval(interval);
-        
-        // Wait a short moment (200ms) for React state updates and the header layout shift to begin/stabilize
         setTimeout(() => {
-          // Scroll smoothly to center
           element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          
-          // Once the smooth scroll is complete (smooth scroll takes around 750-800ms),
-          // activate the screen shading and highlight/focus state!
           setTimeout(() => {
             setFocusedBenefitId(b.id);
-            
-            // Add a temporary glow-highlight ring around the card
             element.classList.add('ring-4', 'ring-brand-gold', 'scale-[1.03]', 'duration-500');
             setTimeout(() => {
               element.classList.remove('ring-4', 'ring-brand-gold', 'scale-[1.03]');
@@ -1179,10 +1227,7 @@ export default function App() {
         }, 150);
       } else {
         attempts++;
-        if (attempts >= maxAttempts) {
-          clearInterval(interval);
-          console.warn(`Could not find element: benefit-card-${b.id} after 40 attempts.`);
-        }
+        if (attempts >= 30) clearInterval(interval);
       }
     }, 50);
   };
@@ -1657,13 +1702,14 @@ export default function App() {
                               }
                             }
 
-                            return catsToShow.map(cat => {
+                            catsToShow = Array.from(new Set(catsToShow));
+                            return catsToShow.map((cat, idx) => {
                               const count = benefits.filter(b => b.category === cat).length;
                               const isActive = selectedCategory === cat;
                               const isCustom = !CATEGORIES.includes(cat as any);
                               return (
                                 <motion.div
-                                  key={cat}
+                                  key={`cat-folder-${cat}-${idx}`}
                                   whileHover={{ scale: 1.02, y: -2 }}
                                   whileTap={{ scale: 0.98 }}
                                   onClick={() => {
@@ -1879,9 +1925,9 @@ export default function App() {
                   </div>
                 ) : (
                   <>
-                    {paginatedBenefits.map((benefit) => (
+                    {paginatedBenefits.map((benefit, index) => (
                       <BenefitCard
-                        key={benefit.id}
+                        key={`benefit-${benefit.id}-${index}`}
                         benefit={benefit}
                         onView={handleViewBenefit}
                         onToggleFavorite={handleToggleFavorite}
@@ -2128,6 +2174,16 @@ export default function App() {
           <span className="text-[10px] font-bold font-sans">الإعدادات</span>
         </button>
       </nav>
+
+      {/* Benefit Detail Pop-Up Modal */}
+      <BenefitDetailModal
+        benefit={modalPopupBenefit}
+        onClose={() => setModalPopupBenefit(null)}
+        onToggleFavorite={handleToggleFavorite}
+        onOpenShareCard={(b) => setSharingBenefit(b)}
+        onJumpToList={handleJumpFromModalToList}
+        showToast={showToast}
+      />
 
       {/* Share Benefit Card Modal */}
       {sharingBenefit && (

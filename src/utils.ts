@@ -78,7 +78,8 @@ export function exportBenefitsToPDF(
   appEmail: string,
   includeCover: boolean = true,
   selectedCategory: string = 'all',
-  pdfTheme: string = 'emerald'
+  pdfTheme: string = 'emerald',
+  isPreviewOnly: boolean = false
 ) {
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
@@ -843,6 +844,26 @@ export function exportBenefitsToPDF(
           }
         }
 
+        ${isPreviewOnly ? `
+        @media print {
+          body * {
+            display: none !important;
+          }
+          body::before {
+            content: "عذراً، طباعة وتنزيل ملف PDF متاح حصرياً للنسخة المفعلة والمدفوعة. يرجى تنشيط النسخة للاستمتاع بالطباعة والتصدير اللامحدود. 🔒";
+            display: block !important;
+            text-align: center;
+            font-family: 'Tajawal', sans-serif;
+            font-size: 20px;
+            font-weight: 800;
+            color: #1e3a2b;
+            padding: 80px 20px;
+            direction: rtl;
+            line-height: 1.8;
+          }
+        }
+        ` : ''}
+
         .category-section-title {
           font-family: 'Tajawal', sans-serif;
           font-size: 16px;
@@ -876,8 +897,20 @@ export function exportBenefitsToPDF(
         }
       </style>
     </head>
-    <body>
-      <div class="container">
+    <body style="padding-top: ${isPreviewOnly ? '0' : '0'};">
+      ${isPreviewOnly ? `
+        <div style="position: sticky; top: 0; z-index: 99999; background: #1e3a2b; color: #ffffff; border-bottom: 3px solid #b5944e; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 15px; font-family: 'Tajawal', sans-serif; direction: rtl; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="background: #b5944e; color: #ffffff; font-weight: 800; padding: 4px 12px; border-radius: 8px; font-size: 12px;">👁️ وضع المعاينة الفاخرة</span>
+            <span style="font-size: 13px; color: #f3f4f6; font-weight: 700;">هذه معاينة مباشرة لشكل وتنسيق ${style === 'book' ? 'الكتاب العلمي' : 'الجدول المنظم'}. طباعة وتحميل ملف الـ PDF مخصص للنسخة المفعلة.</span>
+          </div>
+          <button onclick="if(window.opener && !window.opener.closed){ window.opener.focus(); } window.close();" style="background: linear-gradient(135deg, #b5944e 0%, #d4b56a 100%); color: #1e3a2b; border: none; padding: 8px 20px; border-radius: 10px; font-weight: 900; font-size: 12px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+            🔒 تنشيط النسخة للتحميل والتصدير
+          </button>
+        </div>
+      ` : ''}
+
+      <div class="container" style="padding: ${isPreviewOnly ? '20px' : '0'};">
         
         <!-- Optional Cover Page -->
         ${coverHTML}
@@ -931,12 +964,20 @@ export function exportBenefitsToPDF(
       </div>
       
       <script>
-        // Trigger print/save as PDF as soon as page finishes resource loading
-        window.onload = function() {
-          setTimeout(function() {
-            window.print();
-          }, 800);
-        };
+        ${isPreviewOnly ? `
+          window.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+              e.preventDefault();
+              alert('عذراً، تنزيل وطباعة ملف PDF متاح حصرياً للنسخة المفعلة والمدفوعة. يمكنك المعاينة على الشاشة فقط. 🔒');
+            }
+          });
+        ` : `
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 800);
+          };
+        `}
       </script>
     </body>
     </html>

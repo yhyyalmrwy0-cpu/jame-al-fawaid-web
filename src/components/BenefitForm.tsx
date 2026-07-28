@@ -718,8 +718,8 @@ export const BenefitForm: React.FC<BenefitFormProps> = ({
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-sans text-sm text-zinc-700 bg-zinc-50/50"
               >
-                {categoriesList.map((cat) => (
-                  <option key={cat} value={cat}>
+                {Array.from(new Set(categoriesList)).map((cat, idx) => (
+                  <option key={`cat-${cat}-${idx}`} value={cat}>
                     {cat}
                   </option>
                 ))}

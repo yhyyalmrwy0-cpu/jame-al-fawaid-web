@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Download, Upload, Cloud, RefreshCw, Bell, User, Mail, ShieldCheck, ExternalLink, HelpCircle, Check, AlertTriangle, Play, Smartphone, Copy, Key, Lock, Unlock, Trash2, FolderPlus, FolderSync, X, Wifi, Bluetooth, Radio, Activity, CheckCircle, XCircle } from 'lucide-react';
+import { Download, Upload, Cloud, RefreshCw, Bell, User, Mail, ShieldCheck, ExternalLink, HelpCircle, Check, AlertTriangle, Play, Smartphone, Copy, Key, Lock, Unlock, Trash2, FolderPlus, FolderSync, X, Wifi, Bluetooth, Radio, Activity, CheckCircle, XCircle, ChevronDown, Eye } from 'lucide-react';
 import { AppSettings, Benefit, ScientificQuery, CATEGORIES } from '../types';
 import { exportBenefitsToPDF, formatToHijriAndGregorian, createBackupDataString } from '../utils';
 import { 
@@ -203,6 +203,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const [includeCover, setIncludeCover] = useState(true);
   const [pdfCategorySelect, setPdfCategorySelect] = useState<string>('all');
+
+  // Foldable Accordion Section States (Default folded/closed)
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isBackupOpen, setIsBackupOpen] = useState(false);
+  const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
 
   // Online Activation States (reconnect-free offline storage once validated)
   const [isActivated, setIsActivated] = useState<boolean>(() => {
@@ -1039,151 +1044,147 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
       )}
 
-      {/* 📱 PWA Install Promotion Box (Sleek Arabic design) */}
+      {/* 1. Schedulers & Notifications (Foldable) */}
       {activeView !== 'print' && (
-        <div className="bg-gradient-to-br from-brand-emerald-dark to-brand-emerald text-white rounded-2xl p-5 shadow-lg relative overflow-hidden border border-brand-gold/20 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="absolute top-0 right-0 opacity-10 pointer-events-none transform translate-x-4 -translate-y-4">
-            <span className="text-[120px] font-sans font-black select-none">📱</span>
-          </div>
-          <div className="space-y-1.5 text-right z-10 flex-1">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-brand-gold text-white text-[10px] font-bold">
-              ✨ متاح الآن للتثبيت الفوري
-            </span>
-            <h3 className="text-base font-black text-brand-cream">تثبيت تطبيق جامع الفوائد على الجوال</h3>
-            <p className="text-xs text-brand-cream/90 leading-relaxed max-w-xl">
-              يمكنك إضافة اختصار للتطبيق على الشاشة الرئيسية لجوالك وتصفح وقيد الفوائد العلمية والحديثية أوفلاين بالكامل 100% دون الحاجة لسرعة الإنترنت وبشكل أسرع وأسهل!
-            </p>
-          </div>
+        <div className="bg-white rounded-2xl border border-zinc-200 custom-shadow overflow-hidden transition-all">
           <button
             type="button"
-            onClick={onInstallApp}
-            className="w-full md:w-auto px-5 py-3.5 bg-brand-gold hover:bg-brand-gold-light text-white font-black text-xs rounded-xl shadow-md transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 border border-brand-gold-light z-10 whitespace-nowrap"
+            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+            className="w-full p-4 sm:p-5 flex items-center justify-between text-right cursor-pointer focus:outline-none select-none hover:bg-zinc-50/80 transition-colors"
           >
-            <span>📱 تثبيت تطبيق جامع الفوائد على الجوال</span>
+            <h3 className="text-base font-bold text-brand-emerald-dark flex items-center gap-2">
+              <Bell className="w-5 h-5 text-brand-gold" />
+              نظام التنبيهات والإشعارات الخارجية
+            </h3>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-zinc-400 font-bold hidden sm:inline">
+                {isNotificationsOpen ? 'مطوي' : 'انقر للفتح'}
+              </span>
+              <ChevronDown className={`w-5 h-5 text-zinc-400 transition-transform duration-300 ${isNotificationsOpen ? 'rotate-180' : ''}`} />
+            </div>
           </button>
+
+          <AnimatePresence>
+            {isNotificationsOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="p-5 pt-0 border-t border-zinc-100 space-y-4 mt-2"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3">
+                  <div>
+                    <p className="text-sm font-bold text-zinc-800">تكرار إرسال التنبيهات الدورية التلقائية</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      سيقوم جامع الفوائد تلقائياً بإرسال فوائد مذكرّة من مقيداتك إلى شاشة هاتفك مباشرة حسب الفاصل الزمني المختار.
+                    </p>
+                  </div>
+                  
+                  <select
+                    value={settings.notificationInterval}
+                    onChange={(e) => onUpdateSettings({
+                      ...settings,
+                      notificationInterval: e.target.value as any,
+                    })}
+                    className="px-4 py-2 rounded-xl border border-zinc-200 text-sm bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-brand-emerald font-sans font-bold"
+                  >
+                    <option value="5m">تنبيه تلقائي سريع (كل 5 دقائق)</option>
+                    <option value="30m">كل نصف ساعة (30 دقيقة)</option>
+                    <option value="1h">كل ساعة كاملة</option>
+                    <option value="6h">كل 6 ساعات</option>
+                    <option value="12h">كل 12 ساعة (نصف يوم)</option>
+                    <option value="24h">كل يوم (24 ساعة)</option>
+                    <option value="off">إيقاف التنبيهات التلقائية</option>
+                  </select>
+                </div>
+
+                {/* Browser / Device Native Notifications Permission Status */}
+                <div className="p-4 rounded-xl border border-zinc-150 bg-zinc-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="space-y-1">
+                    <span className="font-bold text-zinc-700 block">حالة إذن الإشعارات الرسمية للنظام (Web Notifications):</span>
+                    <p className="text-zinc-500 text-[11px] leading-relaxed">
+                      تسمح هذه الميزة للتطبيق بتذكيرك حتى عندما لا تستخدم التطبيق بنشاط.
+                    </p>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    {typeof window !== 'undefined' && 'Notification' in window ? (
+                      <>
+                        {Notification.permission === 'granted' && (
+                          <span className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                            مفعلة ونشطة بالكامل على هاتفك ✅
+                          </span>
+                        )}
+                        {Notification.permission === 'denied' && (
+                          <span className="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 font-bold">
+                            محظورة من المتصفح ❌ (يرجى السماح بها من الإعدادات)
+                          </span>
+                        )}
+                        {Notification.permission === 'default' && (
+                          <button
+                            onClick={() => {
+                              Notification.requestPermission().then(permission => {
+                                if (permission === 'granted') {
+                                  showToast('تم تفعيل إشعارات النظام بنجاح!', 'success');
+                                } else {
+                                  showToast('لم يتم منح الإذن بعد.', 'info');
+                                }
+                                // Refresh panel rendering
+                                onUpdateSettings({ ...settings });
+                              });
+                            }}
+                            className="px-3 py-1.5 bg-brand-gold hover:bg-brand-gold-light text-white font-bold rounded-lg transition-colors cursor-pointer text-xs"
+                          >
+                            طلب إذن التنبيهات المباشرة 🔔
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <span className="px-3 py-1.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 font-bold">
+                        غير مدعومة على متصفحك الحالي ⚠️
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-brand-cream/20 rounded-xl border border-brand-cream/40 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="text-right">
+                    <span className="text-xs font-bold text-brand-emerald-dark block">جرب نظام الإشعارات فوراً</span>
+                    <span className="text-[10px] text-zinc-500 block">
+                      اضغط على الزر لمحاكاة ظهور إشعار بالفوائد المكتوبة.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (benefits.length > 0) {
+                        const randomBenefit = benefits[Math.floor(Math.random() * benefits.length)];
+                        if (Notification.permission === 'granted') {
+                          try {
+                            new Notification('فائدة مقيدة 💡', {
+                              body: `${randomBenefit.title}\n${randomBenefit.content.substring(0, 80)}...`,
+                            });
+                          } catch (e) {
+                            showToast(`💡 فائدة اليوم: ${randomBenefit.title}`, 'success');
+                          }
+                        } else {
+                          showToast(`💡 فائدة اليوم: ${randomBenefit.title}`, 'success');
+                        }
+                      } else {
+                        showToast('لا توجد فوائد مقيدة لمحاكاتها!', 'warning');
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-brand-emerald text-white text-xs font-bold rounded-lg cursor-pointer hover:bg-brand-emerald-dark transition-all"
+                  >
+                    تجربة إشعار التذكير 🔔
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
-
-      {/* 1. Schedulers & Notifications */}
-      {activeView !== 'print' &&
-        <div className="bg-white rounded-2xl border border-zinc-200 p-5 custom-shadow">
-          <h3 className="text-base font-bold text-brand-emerald-dark border-b border-zinc-100 pb-3 mb-4 flex items-center gap-2">
-            <Bell className="w-5 h-5 text-brand-gold" />
-            نظام التنبيهات والإشعارات الخارجية
-          </h3>
-
-          <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-bold text-zinc-800">تكرار إرسال التنبيهات الدورية التلقائية</p>
-              <p className="text-xs text-zinc-500 mt-0.5">
-                سيقوم جامع الفوائد تلقائياً بإرسال فوائد مذكرّة من مقيداتك إلى شاشة هاتفك مباشرة حسب الفاصل الزمني المختار.
-              </p>
-            </div>
-            
-            <select
-              value={settings.notificationInterval}
-              onChange={(e) => onUpdateSettings({
-                ...settings,
-                notificationInterval: e.target.value as any,
-              })}
-              className="px-4 py-2 rounded-xl border border-zinc-200 text-sm bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-brand-emerald font-sans font-bold"
-            >
-              <option value="5m">تنبيه تلقائي سريع (كل 5 دقائق)</option>
-              <option value="30m">كل نصف ساعة (30 دقيقة)</option>
-              <option value="1h">كل ساعة كاملة</option>
-              <option value="6h">كل 6 ساعات</option>
-              <option value="12h">كل 12 ساعة (نصف يوم)</option>
-              <option value="24h">كل يوم (24 ساعة)</option>
-              <option value="off">إيقاف التنبيهات التلقائية</option>
-            </select>
-          </div>
-
-          {/* Browser / Device Native Notifications Permission Status */}
-          <div className="p-4 rounded-xl border border-zinc-150 bg-zinc-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="space-y-1">
-              <span className="font-bold text-zinc-700 block">حالة إذن الإشعارات الرسمية للنظام (Web Notifications):</span>
-              <p className="text-zinc-500 text-[11px] leading-relaxed">
-                تسمح هذه الميزة للتطبيق بتذكيرك حتى عندما لا تستخدم التطبيق بنشاط.
-              </p>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              {typeof window !== 'undefined' && 'Notification' in window ? (
-                <>
-                  {Notification.permission === 'granted' && (
-                    <span className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                      مفعلة ونشطة بالكامل على هاتفك ✅
-                    </span>
-                  )}
-                  {Notification.permission === 'denied' && (
-                    <span className="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 font-bold">
-                      محظورة من المتصفح ❌ (يرجى السماح بها من الإعدادات)
-                    </span>
-                  )}
-                  {Notification.permission === 'default' && (
-                    <button
-                      onClick={() => {
-                        Notification.requestPermission().then(permission => {
-                          if (permission === 'granted') {
-                            showToast('تم تفعيل إشعارات النظام بنجاح!', 'success');
-                          } else {
-                            showToast('لم يتم منح الإذن بعد.', 'info');
-                          }
-                          // Refresh panel rendering
-                          onUpdateSettings({ ...settings });
-                        });
-                      }}
-                      className="px-3 py-1.5 bg-brand-gold hover:bg-brand-gold-light text-white font-bold rounded-lg transition-colors cursor-pointer text-xs"
-                    >
-                      طلب إذن التنبيهات المباشرة 🔔
-                    </button>
-                  )}
-                </>
-              ) : (
-                <span className="px-3 py-1.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 font-bold">
-                  غير مدعومة على متصفحك الحالي ⚠️
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="p-4 bg-brand-cream/20 rounded-xl border border-brand-cream/40 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="text-right">
-              <span className="text-xs font-bold text-brand-emerald-dark block">جرب نظام الإشعارات فوراً</span>
-              <span className="text-[10px] text-zinc-500 block">
-                اضغط على الزر لمحاكاة ظهور إشعار بالفوائد المكتوبة.
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (benefits.length > 0) {
-                  const randomBenefit = benefits[Math.floor(Math.random() * benefits.length)];
-                  if (Notification.permission === 'granted') {
-                    try {
-                      new Notification('فائدة مقيدة 💡', {
-                        body: `${randomBenefit.title}\n${randomBenefit.content.substring(0, 80)}...`,
-                      });
-                    } catch (e) {
-                      showToast(`💡 فائدة اليوم: ${randomBenefit.title}`, 'success');
-                    }
-                  } else {
-                    showToast(`💡 فائدة اليوم: ${randomBenefit.title}`, 'success');
-                  }
-                } else {
-                  showToast('لا توجد فوائد مقيدة لمحاكاتها!', 'warning');
-                }
-              }}
-              className="px-3 py-1.5 bg-brand-emerald text-white text-xs font-bold rounded-lg cursor-pointer hover:bg-brand-emerald-dark transition-all"
-            >
-              تجربة إشعار التذكير 🔔
-            </button>
-          </div>
-        </div>
-      </div>
-    }
 
       {/* PDF Export Section */}
       {activeView === 'print' &&
@@ -1443,8 +1444,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       }`}
                     >
                       <option value="" className="text-zinc-700 font-bold bg-white">📁 اختر قسماً محدداً فقط لتصديره...</option>
-                      {CATEGORIES.map(cat => (
-                        <option key={cat} value={cat} className="text-zinc-700 font-bold bg-white">
+                      {Array.from(new Set(CATEGORIES)).map((cat, idx) => (
+                        <option key={`settings-cat-${cat}-${idx}`} value={cat} className="text-zinc-700 font-bold bg-white">
                           قسم {cat} ({benefits.filter(b => b.category === cat).length} فائدة)
                         </option>
                       ))}
@@ -1464,77 +1465,127 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
             </div>
 
-            {/* Submit Export Button with Premium Check */}
+            {/* Submit Export & Preview Buttons */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-brand-gold/10">
               <div className="text-[11px] text-zinc-500 text-right">
                 {!isActivated ? (
-                  !freePdfUsed ? (
-                    <span className="text-brand-emerald-dark font-black flex items-center gap-1">
-                      🎁 متبقي لك {2 - freePdfCount} محاولة/محاولات تجريبية مجانية لطباعة وتصدير ملف الـ PDF الفاخر.
-                    </span>
-                  ) : (
-                    <span className="text-rose-600 font-bold flex items-center gap-1">
-                      ❌ انتهت المحاولتان التجريبيتان المجانيتان. يرجى تفعيل النسخة الذهبية للمتابعة والطباعة المفتوحة.
-                    </span>
-                  )
+                  <span className="text-amber-800 font-bold flex items-center gap-1.5 bg-amber-50 p-2 rounded-xl border border-amber-200/60">
+                    <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>المعاينة المباشرة لشكل الكتاب متاحة مجاناً، بينما التحميل والتصدير بصيغة PDF مخصص للنسخة المفعلة.</span>
+                  </span>
                 ) : (
-                  <span className="text-emerald-700 font-bold flex items-center gap-1">
-                    🟢 التصدير نشط وغير محدود مدى الحياة بمختلف التنسيقات الفاخرة.
+                  <span className="text-emerald-700 font-bold flex items-center gap-1.5 bg-emerald-50 p-2 rounded-xl border border-emerald-200/60">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>الطباعة والتصدير نشطة وغير محدودة مدى الحياة لكافة الفوائد والتقارير.</span>
                   </span>
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  if (benefits.length === 0) {
-                    showToast('لا توجد مدونات علمية لتصديرها! يرجى إضافة فائدة أولاً.', 'warning');
-                    return;
-                  }
-
-                  if (!isActivated && freePdfUsed) {
-                    showToast('عذراً، لقد استنفدت محاولتيك المجانيتين للطباعة. يرجى تفعيل رخصة التصدير للاستخدام اللامحدود والطباعة المفتوحة. 🔒', 'warning');
-                    if (onShowPremiumPromo) onShowPremiumPromo();
-                    return;
-                  }
-
-                  // Perform PDF Generation
-                  exportBenefitsToPDF(benefits, pdfStyle, pdfBookTitle, pdfAuthorName, settings.programmerEmail, includeCover, pdfCategorySelect, pdfTheme);
-                  
-                  if (!isActivated) {
-                    const newCount = freePdfCount + 1;
-                    localStorage.setItem('abuosid_free_pdf_count', String(newCount));
-                    setFreePdfCount(newCount);
-                    
-                    if (newCount >= 2) {
-                      showToast('تم تصدير ملف الـ PDF بنجاح واستهلاك المحاولة المجانية الثانية والأخيرة. للطباعة مجدداً يرجى تنشيط النسخة المميزة. 🎉', 'success');
-                    } else {
-                      showToast('تم تصدير ملف الـ PDF بنجاح واستهلاك المحاولة المجانية الأولى. متبقي لك محاولة مجانية واحدة أخرى. 🎉', 'success');
+              <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
+                {/* Preview Button (Available to ALL users) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (benefits.length === 0) {
+                      showToast('لا توجد مدونات علمية لتصديرها! يرجى إضافة فائدة أولاً.', 'warning');
+                      return;
                     }
-                  } else {
-                    showToast('جاري تحضير ملف PDF وتوليده بنجاح للطباعة... 📥', 'success');
-                  }
-                }}
-                className="px-6 py-3 text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto hover:scale-[1.01] active:scale-[0.99] bg-brand-gold hover:bg-brand-gold-light text-white"
-              >
-                <Download className="w-4 h-4 text-white" />
-                <span>تحميل وتوليد الكتاب الفاخر (PDF) 📗</span>
-              </button>
+                    showToast('جاري فتح معاينة شكل الكتاب العلمي... 👁️', 'info');
+                    exportBenefitsToPDF(
+                      benefits,
+                      pdfStyle,
+                      pdfBookTitle,
+                      pdfAuthorName,
+                      settings.programmerEmail,
+                      includeCover,
+                      pdfCategorySelect,
+                      pdfTheme,
+                      !isActivated // isPreviewOnly if not activated
+                    );
+                  }}
+                  className="px-5 py-2.5 text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto hover:bg-zinc-100 bg-white border border-brand-gold/40 text-brand-emerald-dark"
+                >
+                  <Eye className="w-4 h-4 text-brand-gold" />
+                  <span>معاينة شكل الكتاب (Preview) 👁️</span>
+                </button>
+
+                {/* PDF Download Button (Gated to Paid Activated Version) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (benefits.length === 0) {
+                      showToast('لا توجد مدونات علمية لتصديرها! يرجى إضافة فائدة أولاً.', 'warning');
+                      return;
+                    }
+
+                    if (!isActivated) {
+                      showToast('عذراً، تنزيل وتصدير ملف الـ PDF متاح حصرياً لأصحاب النسخة المدفوعة. يمكنك معاينة الشكل مجاناً عبر زر المعاينة! 🔒', 'warning');
+                      if (onShowPremiumPromo) onShowPremiumPromo();
+                      return;
+                    }
+
+                    // Perform PDF Generation for activated users
+                    exportBenefitsToPDF(
+                      benefits,
+                      pdfStyle,
+                      pdfBookTitle,
+                      pdfAuthorName,
+                      settings.programmerEmail,
+                      includeCover,
+                      pdfCategorySelect,
+                      pdfTheme,
+                      false // full print & save PDF
+                    );
+                    showToast('جاري تحضير وتوليد ملف PDF الفاخر للطباعة... 📥', 'success');
+                  }}
+                  className={`px-6 py-2.5 text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto ${
+                    isActivated
+                      ? 'bg-brand-emerald hover:bg-brand-emerald-dark text-white'
+                      : 'bg-zinc-100 text-zinc-500 border border-zinc-250 hover:bg-zinc-200'
+                  }`}
+                >
+                  {isActivated ? (
+                    <Download className="w-4 h-4 text-white" />
+                  ) : (
+                    <Lock className="w-4 h-4 text-amber-600" />
+                  )}
+                  <span>{isActivated ? 'تحميل وتوليد الكتاب (PDF) 📗' : 'تنزيل PDF (للنسخة المدفوعة) 🔒'}</span>
+                </button>
+              </div>
             </div>
           </div>
         }
 
-      {/* 2. Backup & Restore Section */}
-      {activeView !== 'print' &&
-        <div className="bg-white rounded-2xl border border-zinc-200 p-5 custom-shadow">
-          <h3 className="text-base font-bold text-brand-emerald-dark border-b border-zinc-100 pb-3 mb-4 flex items-center gap-2">
-            <Cloud className="w-5 h-5 text-brand-gold" />
-            النسخ الاحتياطي ومزامنة البيانات
-          </h3>
+      {/* 2. Backup & Restore Section (Foldable) */}
+      {activeView !== 'print' && (
+        <div className="bg-white rounded-2xl border border-zinc-200 custom-shadow overflow-hidden transition-all">
+          <button
+            type="button"
+            onClick={() => setIsBackupOpen(!isBackupOpen)}
+            className="w-full p-4 sm:p-5 flex items-center justify-between text-right cursor-pointer focus:outline-none select-none hover:bg-zinc-50/80 transition-colors"
+          >
+            <h3 className="text-base font-bold text-brand-emerald-dark flex items-center gap-2">
+              <Cloud className="w-5 h-5 text-brand-gold" />
+              النسخ الاحتياطي ومزامنة البيانات
+            </h3>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-zinc-400 font-bold hidden sm:inline">
+                {isBackupOpen ? 'مطوي' : 'انقر للفتح'}
+              </span>
+              <ChevronDown className={`w-5 h-5 text-zinc-400 transition-transform duration-300 ${isBackupOpen ? 'rotate-180' : ''}`} />
+            </div>
+          </button>
 
-          <div className="space-y-4">
-            {/* Responsive Backup Options Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+          <AnimatePresence>
+            {isBackupOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="p-5 pt-0 border-t border-zinc-100 space-y-4 mt-2"
+              >
+                {/* Responsive Backup Options Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
             {/* Local Phone Backup */}
             <div className="p-4 rounded-xl border border-zinc-100 bg-zinc-50/40 flex flex-col justify-between">
               <div className="space-y-1 text-right">
@@ -1831,7 +1882,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
             </div>
           </div>
-        </div>
 
         {/* Backups History and Restore Manager */}
         <div className="mt-5 pt-4 border-t border-zinc-100">
@@ -1881,7 +1931,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <p className="text-xs text-zinc-400 text-center py-6">لا توجد نسخ احتياطية محلية محفوظة حالياً.</p>
             ) : (
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                {backupsHistory.map((historyItem) => {
+                {backupsHistory.map((historyItem, idx) => {
                   const dateObj = new Date(historyItem.timestamp);
                   const timeStr = `${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
                   const formattedDate = formatToHijriAndGregorian(
@@ -1903,7 +1953,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
                   return (
                     <div
-                      key={historyItem.id}
+                      key={`local-backup-${historyItem.id}-${idx}`}
                       className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-zinc-100 bg-zinc-50/50 hover:bg-zinc-50 transition-colors text-xs gap-3"
                     >
                       <div className="flex items-center gap-3">
@@ -1967,7 +2017,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <p className="text-xs text-zinc-400 text-center py-6">لا توجد نسخ احتياطية سحابية محفوظة حالياً على حساب جوجل درايف.</p>
             ) : (
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                {cloudBackups.map((historyItem) => {
+                {cloudBackups.map((historyItem, idx) => {
                   const dateObj = new Date(historyItem.timestamp);
                   const timeStr = `${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
                   const formattedDate = formatToHijriAndGregorian(
@@ -1989,7 +2039,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
                   return (
                     <div
-                      key={historyItem.id}
+                      key={`cloud-backup-${historyItem.id}-${idx}`}
                       className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-zinc-100 bg-zinc-50/50 hover:bg-zinc-50 transition-colors text-xs gap-3"
                     >
                       <div className="flex items-center gap-3">
@@ -2063,125 +2113,72 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   );
                 })}
               </div>
-            )
-          )}
-        </div>
-      </div>
-    }
+            ))}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  </div>
+)}
 
-      {/* 3. Welcome Screen & Help Section */}
-      {activeView !== 'print' &&
-        <>
-          <div className="bg-white rounded-2xl border border-zinc-200 p-5 custom-shadow">
-        <h3 className="text-base font-bold text-brand-emerald-dark border-b border-zinc-100 pb-3 mb-4 flex items-center gap-2">
-          <HelpCircle className="w-5 h-5 text-brand-gold" />
-          الشاشة الترحيبية ومكونات التطبيق 📚✨
-        </h3>
-
-        <div className="space-y-4 font-sans text-right">
-          <div className="p-4 rounded-xl border border-zinc-100 bg-zinc-50/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div className="space-y-1">
-              <span className="text-sm font-bold text-zinc-800 block">هل ترغب في مراجعة الشاشة الترحيبية والتعليمية؟</span>
-              <span className="text-xs text-zinc-500 block leading-relaxed">
-                اضغط على الزر لعرض نافذة التعريف بمزايا جامع الفوائد وكيفية تدوين الفوائد والشوارد، وتصميم ومشاركة بطاقات الفوائد.
+      {/* 3. Welcome Screen & Help Section (Foldable) */}
+      {activeView !== 'print' && (
+        <div className="bg-white rounded-2xl border border-zinc-200 custom-shadow overflow-hidden transition-all">
+          <button
+            type="button"
+            onClick={() => setIsWelcomeOpen(!isWelcomeOpen)}
+            className="w-full p-4 sm:p-5 flex items-center justify-between text-right cursor-pointer focus:outline-none select-none hover:bg-zinc-50/80 transition-colors"
+          >
+            <h3 className="text-base font-bold text-brand-emerald-dark flex items-center gap-2">
+              <HelpCircle className="w-5 h-5 text-brand-gold" />
+              الشاشة الترحيبية ومكونات التطبيق 📚✨
+            </h3>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-zinc-400 font-bold hidden sm:inline">
+                {isWelcomeOpen ? 'مطوي' : 'انقر للفتح'}
               </span>
+              <ChevronDown className={`w-5 h-5 text-zinc-400 transition-transform duration-300 ${isWelcomeOpen ? 'rotate-180' : ''}`} />
             </div>
+          </button>
 
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  if (onShowWelcome) {
-                    onShowWelcome();
-                  }
-                }}
-                className="py-2 px-4 bg-brand-emerald hover:bg-brand-emerald-dark text-white text-xs font-bold rounded-lg transition-all shadow-sm cursor-pointer flex items-center gap-2"
+          <AnimatePresence>
+            {isWelcomeOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="p-5 pt-0 border-t border-zinc-100 space-y-4 font-sans text-right mt-2"
               >
-                <span>عرض الشاشة الترحيبية 📚✨</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+                <div className="p-4 rounded-xl border border-zinc-100 bg-zinc-50/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mt-3">
+                  <div className="space-y-1">
+                    <span className="text-sm font-bold text-zinc-800 block">هل ترغب في مراجعة الشاشة الترحيبية والتعليمية؟</span>
+                    <span className="text-xs text-zinc-500 block leading-relaxed">
+                      اضغط على الزر لعرض نافذة التعريف بمزايا جامع الفوائد وكيفية تدوين الفوائد والشوارد، وتصميم ومشاركة بطاقات الفوائد.
+                    </span>
+                  </div>
 
-      {/* 4. Mobile PWA Installation Guidelines */}
-      <div className="bg-white rounded-2xl border border-zinc-200 p-5 custom-shadow">
-        <h3 className="text-base font-bold text-brand-emerald-dark border-b border-zinc-100 pb-3 mb-4 flex items-center gap-2">
-          <Smartphone className="w-5 h-5 text-brand-gold" />
-          تثبيت تطبيق جامع الفوائد على هاتفك
-        </h3>
-
-        <div className="flex flex-col md:flex-row gap-6 items-center">
-          {/* Visual Phone App Mockup */}
-          <div className="relative flex flex-col items-center shrink-0 p-4 bg-brand-cream/15 rounded-2xl border border-brand-cream/30 w-full md:w-56 text-center select-none">
-            <div className="absolute top-2 right-2 text-[9px] bg-brand-gold/15 text-brand-emerald-dark px-2 py-0.5 rounded-full font-bold">
-              إيقونة التطبيق الرسمية
-            </div>
-            
-            {/* Phone Frame App Icon Simulation */}
-            <div className="relative group mt-4 mb-3">
-              <div className="absolute inset-0 bg-brand-gold/20 rounded-3xl blur-md scale-105 group-hover:blur-lg transition-all" />
-              <AppLogo className="w-24 h-24 relative" animate={true} />
-            </div>
-            
-            <span className="text-sm font-black text-brand-emerald-dark">جامع الفوائد</span>
-            <span className="text-[10px] text-zinc-400 mt-0.5">تطبيق ويب تقدمي (PWA)</span>
-            
-            <button
-              onClick={handleCopyLink}
-              className="mt-4 w-full py-2 bg-brand-cream/60 hover:bg-brand-cream text-brand-emerald-dark text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-brand-cream/30"
-            >
-              {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600 animate-bounce" /> : <Copy className="w-3.5 h-3.5 text-brand-gold" />}
-              <span>{copiedLink ? 'تم نسخ الرابط!' : 'نسخ رابط التطبيق لهاتفك'}</span>
-            </button>
-          </div>
-
-          {/* Installation steps */}
-          <div className="flex-1 space-y-4">
-            <p className="text-xs text-zinc-600 leading-relaxed">
-              يدعم هذا التطبيق التثبيت المباشر والمستقر على شاشة هاتفك كـ <strong className="text-brand-emerald font-bold">تطبيق ويب تقدمي (PWA)</strong>. يعمل بالكامل وبكفاءة عالية وموفر لمساحة تخزين الهاتف، دون الحاجة لتحميل ملفات APK الخارجية التي تطلب صلاحيات قد تؤثر على أمان وسلاسة هاتفك.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Android Steps */}
-              <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-100">
-                <div className="flex items-center gap-2 mb-2 text-brand-emerald border-b border-zinc-200/50 pb-1.5">
-                  <span className="w-5 h-5 rounded-full bg-brand-cream text-brand-emerald flex items-center justify-center text-xs font-bold">أ</span>
-                  <span className="text-xs font-bold">لأجهزة أندرويد (Google Chrome)</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onShowWelcome) {
+                          onShowWelcome();
+                        }
+                      }}
+                      className="py-2 px-4 bg-brand-emerald hover:bg-brand-emerald-dark text-white text-xs font-bold rounded-lg transition-all shadow-sm cursor-pointer flex items-center gap-2"
+                    >
+                      <span>عرض الشاشة الترحيبية 📚✨</span>
+                    </button>
+                  </div>
                 </div>
-                <ul className="text-[11px] text-zinc-600 space-y-2 leading-relaxed">
-                  <li>١. افتح رابط التطبيق في متصفح <strong className="text-zinc-800">Google Chrome</strong> على هاتفك.</li>
-                  <li>٢. اضغط على زر القائمة <strong className="text-zinc-800">(︙)</strong> أعلى يسار الشاشة.</li>
-                  <li>٣. اختر <strong className="text-brand-emerald">إضافة إلى الشاشة الرئيسية</strong> أو <strong className="text-brand-emerald">تثبيت التطبيق</strong> لتأكيد التثبيت.</li>
-                </ul>
-              </div>
-
-              {/* iOS Steps */}
-              <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-100">
-                <div className="flex items-center gap-2 mb-2 text-brand-emerald border-b border-zinc-200/50 pb-1.5">
-                  <span className="w-5 h-5 rounded-full bg-brand-cream text-brand-emerald flex items-center justify-center text-xs font-bold">آي</span>
-                  <span className="text-xs font-bold">لأجهزة آيفون وآيباد (Safari)</span>
-                </div>
-                <ul className="text-[11px] text-zinc-600 space-y-2 leading-relaxed">
-                  <li>١. افتح رابط التطبيق في متصفح <strong className="text-zinc-800">Safari</strong> الخاص بجهازك.</li>
-                  <li>٢. اضغط على أيقونة <strong className="text-zinc-800">المشاركة (📤)</strong> أسفل شاشة المتصفح.</li>
-                  <li>٣. اسحب القائمة لأسفل واختر <strong className="text-brand-emerald">إضافة إلى الشاشة الرئيسية (Add to Home Screen)</strong>.</li>
-                </ul>
-              </div>
-            </div>
-
-            {/* Benefits of PWA over APK */}
-            <div className="text-[10px] text-zinc-500 bg-brand-cream/15 p-3 rounded-lg border border-brand-cream/30 grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
-              <div>🔒 آمن بالكامل ويحمي خصوصيتك</div>
-              <div>⚡️ سرعة خارقة في التصفح والولوج</div>
-              <div>💾 يدعم وضع عدم الاتصال (Offline)</div>
-            </div>
-          </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-      </div>
+      )}
 
       {/* 3.5. Admin Key Management Control Panel */}
-      {isControlPanelVisible && (
+      {activeView !== 'print' && isControlPanelVisible && (
         <div className="bg-white rounded-2xl border-2 border-brand-gold/20 p-5 custom-shadow space-y-4">
           <button
             type="button"
@@ -2552,9 +2549,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         {Object.keys(adminKeysList).length === 0 ? (
                           <p className="text-center text-xs text-zinc-400 py-4 font-sans">لا توجد رموز مسجلة حالياً في قاعدة البيانات.</p>
                         ) : (
-                          (Object.entries(adminKeysList) as [string, any][]).map(([keyString, info]) => (
+                          (Object.entries(adminKeysList) as [string, any][]).map(([keyString, info], idx) => (
                             <div
-                              key={keyString}
+                              key={`admin-key-${keyString}-${idx}`}
                               className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-2.5 rounded-lg border border-zinc-150 bg-white hover:bg-zinc-50 transition-colors text-xs gap-2.5"
                             >
                               <div className="space-y-1 flex-1 text-right w-full">
@@ -2651,61 +2648,61 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
 
       {/* 4. Developer and App Information */}
-      <div className="bg-gradient-to-l from-brand-emerald-dark to-brand-emerald rounded-2xl p-6 text-white border border-brand-gold/20 custom-shadow">
-        <h3 className="text-base font-bold text-brand-gold-light border-b border-white/10 pb-3 mb-4 flex items-center gap-2">
-          <User className="w-5 h-5 text-brand-gold-light" />
-          معلومات التطبيق والمبرمج المعتمد
-        </h3>
+      {activeView !== 'print' && (
+        <div className="bg-gradient-to-l from-brand-emerald-dark to-brand-emerald rounded-2xl p-6 text-white border border-brand-gold/20 custom-shadow">
+          <h3 className="text-base font-bold text-brand-gold-light border-b border-white/10 pb-3 mb-4 flex items-center gap-2">
+            <User className="w-5 h-5 text-brand-gold-light" />
+            معلومات التطبيق والمبرمج المعتمد
+          </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-          <div className="space-y-3 font-sans">
-            <div
-              onMouseDown={startHoldDeveloper}
-              onMouseUp={cancelHoldDeveloper}
-              onMouseLeave={cancelHoldDeveloper}
-              onTouchStart={startHoldDeveloper}
-              onTouchEnd={cancelHoldDeveloper}
-              className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 border border-transparent transition-all duration-300 cursor-pointer select-none"
-            >
-              <div className="p-2 bg-white/10 rounded-xl border border-white/10 text-brand-gold-light shrink-0">
-                <User className="w-5 h-5" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+            <div className="space-y-3 font-sans">
+              <div
+                onMouseDown={startHoldDeveloper}
+                onMouseUp={cancelHoldDeveloper}
+                onMouseLeave={cancelHoldDeveloper}
+                onTouchStart={startHoldDeveloper}
+                onTouchEnd={cancelHoldDeveloper}
+                className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 border border-transparent transition-all duration-300 cursor-pointer select-none"
+              >
+                <div className="p-2 bg-white/10 rounded-xl border border-white/10 text-brand-gold-light shrink-0">
+                  <User className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs text-zinc-300">اسم مطور البرنامج</p>
+                  <p className="text-sm font-bold text-white">أبو أُسيد</p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-zinc-300">اسم مطور البرنامج</p>
-                <p className="text-sm font-bold text-white">أبو أُسيد</p>
+
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/10 rounded-xl border border-white/10 text-brand-gold-light shrink-0">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs text-zinc-300">البريد الإلكتروني للتواصل والدعم العلمي</p>
+                  <a href="mailto:abuosid773@gmail.com" className="text-sm font-bold text-white hover:text-brand-gold-light transition-colors underline">
+                    abuosid773@gmail.com
+                  </a>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/10 rounded-xl border border-white/10 text-brand-gold-light shrink-0">
-                <Mail className="w-5 h-5" />
+            <div className="p-4 bg-white/5 border border-white/10 rounded-xl space-y-2.5 text-right font-sans">
+              <div className="flex items-center gap-1.5 text-brand-gold-light text-xs font-bold">
+                <ShieldCheck className="w-4 h-4" />
+                <span>حقوق التدوين والملكية</span>
               </div>
-              <div>
-                <p className="text-xs text-zinc-300">البريد الإلكتروني للتواصل والدعم العلمي</p>
-                <a href="mailto:abuosid773@gmail.com" className="text-sm font-bold text-white hover:text-brand-gold-light transition-colors underline">
-                  abuosid773@gmail.com
-                </a>
+              <p className="text-xs text-zinc-200 leading-relaxed font-sans">
+                هذا التطبيق مخصص للطلبة والباحثين لتقييد وتدوين وحل الفوائد والاستشكالات العلمية، ومصمم ليوفر أعلى سبل الراحة والخصوصية على الهواتف والأجهزة الذكية.
+              </p>
+              <div className="text-[10px] text-zinc-300 pt-1.5 border-t border-white/5 flex items-center justify-between">
+                <span>الإصدار الحالي: v1.0.0</span>
+                <span>بكل فخر بالوطن العربي 🇾🇪</span>
               </div>
-            </div>
-          </div>
-
-          <div className="p-4 bg-white/5 border border-white/10 rounded-xl space-y-2.5 text-right font-sans">
-            <div className="flex items-center gap-1.5 text-brand-gold-light text-xs font-bold">
-              <ShieldCheck className="w-4 h-4" />
-              <span>حقوق التدوين والملكية</span>
-            </div>
-            <p className="text-xs text-zinc-200 leading-relaxed font-sans">
-              هذا التطبيق مخصص للطلبة والباحثين لتقييد وتدوين وحل الفوائد والاستشكالات العلمية، ومصمم ليوفر أعلى سبل الراحة والخصوصية على الهواتف والأجهزة الذكية.
-            </p>
-            <div className="text-[10px] text-zinc-300 pt-1.5 border-t border-white/5 flex items-center justify-between">
-              <span>الإصدار الحالي: v1.0.0</span>
-              <span>بكل فخر بالوطن العربي 🇾🇪</span>
             </div>
           </div>
         </div>
-      </div>
-    </>
-  }
+      )}
 
       {/* Custom Confirmation Modal */}
       {confirmModal && (

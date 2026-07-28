@@ -502,9 +502,9 @@ export const QueryManager: React.FC<QueryManagerProps> = ({
             <p className="text-xs text-zinc-400 mt-1">اضغط على زر الإضافة لتسجيل إشكال أو لبس علمي تبحث عن تحقيقه.</p>
           </div>
         ) : (
-          filteredQueries.map((q) => (
+          filteredQueries.map((q, idx) => (
             <motion.div
-              key={q.id}
+              key={`query-${q.id}-${idx}`}
               layout
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}

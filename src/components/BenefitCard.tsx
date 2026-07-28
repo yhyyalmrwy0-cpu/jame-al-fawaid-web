@@ -265,7 +265,7 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
                       ) : (
                         <>
                           <Copy className="w-3.5 h-3.5 text-brand-emerald" />
-                          <span>نسخ سريع</span>
+                          <span>نسخ</span>
                         </>
                       )}
                     </button>
