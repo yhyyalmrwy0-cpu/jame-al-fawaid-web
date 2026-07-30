@@ -41,7 +41,7 @@ import { PremiumPromoModal } from './components/PremiumPromoModal';
 import { WelcomeModal } from './components/WelcomeModal';
 import { BenefitDetailModal } from './components/BenefitDetailModal';
 import { getApiUrl } from './utils/api';
-import { getArabicSearchRegex, formatToHijriAndGregorian, normalizeArabicText, createBackupDataString, restoreControlPanelData } from './utils';
+import { getArabicSearchRegex, formatToHijriAndGregorian, normalizeArabicText, createBackupDataString, restoreControlPanelData, saveBackupHistorySafely } from './utils';
 
 // Initial Starter Data for visual polish and immediate functionality on load
 const STARTER_BENEFITS: Benefit[] = [
@@ -215,6 +215,49 @@ export default function App() {
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
+  }, []);
+
+  // Local Database Persistence for Control Panel & Visitor Stats
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return;
+      const hasVisited = localStorage.getItem('abuosid_device_visited');
+      const existingStatsStr = localStorage.getItem('abuosid_admin_stats');
+      const existingKeysStr = localStorage.getItem('abuosid_admin_keys_list');
+      
+      let keysList = existingKeysStr ? JSON.parse(existingKeysStr) : {};
+      let stats = existingStatsStr ? JSON.parse(existingStatsStr) : null;
+      
+      const keysArray = Object.values(keysList) as any[];
+      const usedCount = keysArray.filter(k => k.used).length;
+      const freeCount = keysArray.filter(k => !k.used).length;
+      const totalCount = Object.keys(keysList).length;
+
+      if (!stats) {
+        stats = {
+          totalVisitors: 1,
+          totalSubscribers: usedCount,
+          totalFreeUsers: 0,
+          totalKeys: totalCount,
+          usedKeys: usedCount,
+          freeKeys: freeCount,
+        };
+      }
+
+      if (!hasVisited) {
+        localStorage.setItem('abuosid_device_visited', 'true');
+        stats.totalVisitors = (stats.totalVisitors || 0) + 1;
+      }
+      
+      stats.totalKeys = totalCount;
+      stats.usedKeys = usedCount;
+      stats.freeKeys = freeCount;
+      stats.totalSubscribers = Math.max(stats.totalSubscribers || 0, usedCount);
+
+      localStorage.setItem('abuosid_admin_stats', JSON.stringify(stats));
+    } catch (e) {
+      console.error("Local stats persistence init error:", e);
+    }
   }, []);
 
   const handleInstallClick = async () => {
@@ -397,15 +440,9 @@ export default function App() {
         data: backupData
       };
 
-      // Add to head
+      // Add to head and save safely
       history = [newBackup, ...history];
-
-      // Limit to 10 backups to conserve space
-      if (history.length > 10) {
-        history = history.slice(0, 10);
-      }
-
-      localStorage.setItem('abuosid_backups_history', JSON.stringify(history));
+      saveBackupHistorySafely(history);
 
       // 1. Download file to device for 'daily', 'on_exit', or 'manual' triggers if backupType is local
       if (settings.backupType === 'local') {
@@ -513,8 +550,8 @@ export default function App() {
             data: backupData
           };
 
-          history = [newBackup, ...history].slice(0, 10);
-          localStorage.setItem('abuosid_backups_history', JSON.stringify(history));
+          history = [newBackup, ...history];
+          saveBackupHistorySafely(history);
 
           // Directly write back last backup time in settings to localStorage synchronusly
           const currentSettings = localStorage.getItem('abuosid_settings');
@@ -536,6 +573,8 @@ export default function App() {
   // UI state filters
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchContainerRef = React.useRef<HTMLDivElement | null>(null);
   const [isFullTextSearch, setIsFullTextSearch] = useState(false); // Toggle for full text body search
   const [visibleCount, setVisibleCount] = useState(10); // Pagination / Lazy loading count (10 initially)
   const [selectedCategory, setSelectedCategory] = useState<string>('الكل');
@@ -1393,6 +1432,23 @@ export default function App() {
     return result;
   }, [benefits, debouncedSearchQuery, isFullTextSearch, selectedCategory, onlyFavorites]);
 
+  // Determine if search results are exact phrase matches or approximate/partial matches
+  const isExactSearchMatch = useMemo(() => {
+    if (!debouncedSearchQuery || debouncedSearchQuery.trim().length < 3) return true;
+    if (filteredBenefits.length === 0) return true;
+
+    const normQuery = normalizeArabicText(debouncedSearchQuery.trim());
+    if (!normQuery) return true;
+
+    return filteredBenefits.every(b => {
+      const titleNorm = normalizeArabicText(b.title || '');
+      const metaNorm = normalizeArabicText([b.category || '', b.source || '', b.date || ''].join(' '));
+      const contentNorm = normalizeArabicText(b.content || '');
+
+      return titleNorm.includes(normQuery) || metaNorm.includes(normQuery) || contentNorm.includes(normQuery);
+    });
+  }, [debouncedSearchQuery, filteredBenefits]);
+
   // Paginated/Lazy Loaded subset (renders first 10 items initially for 60fps rendering)
   const paginatedBenefits = useMemo(() => {
     return filteredBenefits.slice(0, visibleCount);
@@ -1815,7 +1871,17 @@ export default function App() {
               </AnimatePresence>
 
               {/* Search Bar placed DIRECTLY above the benefits list */}
-              <div className="relative w-full space-y-2">
+              <div 
+                ref={searchContainerRef}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={(e) => {
+                  if (searchContainerRef.current && searchContainerRef.current.contains(e.relatedTarget as Node)) {
+                    return;
+                  }
+                  setIsSearchFocused(false);
+                }}
+                className="relative w-full space-y-2"
+              >
                 <div className="relative w-full">
                   <input
                     ref={searchInputRef}
@@ -1837,7 +1903,8 @@ export default function App() {
                       onClick={(e) => {
                         e.preventDefault();
                         setSearchQuery('');
-                        searchInputRef.current?.focus();
+                        setIsSearchFocused(false);
+                        searchInputRef.current?.blur();
                       }}
                       className="absolute left-4 top-3 p-1 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-150 rounded-full transition-all cursor-pointer active:scale-90"
                       title="مسح البحث"
@@ -1847,37 +1914,49 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Search Options & Toggle Row */}
-                <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-                  {/* Full Text Search Toggle Button */}
-                  <label className="inline-flex items-center gap-2 text-xs font-bold text-zinc-700 bg-white px-3 py-1.5 rounded-xl border border-zinc-200/80 shadow-xs cursor-pointer select-none hover:bg-brand-cream/30 transition-all">
-                    <input
-                      type="checkbox"
-                      checked={isFullTextSearch}
-                      onChange={(e) => setIsFullTextSearch(e.target.checked)}
-                      className="w-4 h-4 text-brand-emerald rounded border-zinc-300 focus:ring-brand-emerald accent-brand-emerald cursor-pointer"
-                    />
-                    <span className="flex items-center gap-1.5">
-                      <span>بحث شامل في النصوص</span>
-                      {isFullTextSearch ? (
-                        <span className="text-[10px] bg-brand-gold/20 text-brand-gold-dark font-black px-1.5 py-0.5 rounded-md">
-                          مفعّل 📖
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-zinc-400 font-normal">
-                          (سريع: العناوين والوسوم والمصادر)
-                        </span>
-                      )}
-                    </span>
-                  </label>
+                {/* Search Options & Toggle Row - Hidden by default, shown ONLY when search is active or focused */}
+                <AnimatePresence>
+                  {(isSearchFocused || searchQuery.trim().length > 0) && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2 px-1 pt-1">
+                        {/* Full Text Search Toggle Button */}
+                        <label className="inline-flex items-center gap-2 text-xs font-bold text-zinc-700 bg-white px-3 py-1.5 rounded-xl border border-zinc-200/80 shadow-xs cursor-pointer select-none hover:bg-brand-cream/30 transition-all">
+                          <input
+                            type="checkbox"
+                            checked={isFullTextSearch}
+                            onChange={(e) => setIsFullTextSearch(e.target.checked)}
+                            className="w-4 h-4 text-brand-emerald rounded border-zinc-300 focus:ring-brand-emerald accent-brand-emerald cursor-pointer"
+                          />
+                          <span className="flex items-center gap-1.5">
+                            <span>بحث شامل في النصوص</span>
+                            {isFullTextSearch ? (
+                              <span className="text-[10px] bg-brand-gold/20 text-brand-gold-dark font-black px-1.5 py-0.5 rounded-md">
+                                مفعّل 📖
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-zinc-400 font-normal">
+                                (سريع: العناوين والوسوم والمصادر)
+                              </span>
+                            )}
+                          </span>
+                        </label>
 
-                  {/* Notice when typing less than 3 characters */}
-                  {searchQuery.trim().length > 0 && searchQuery.trim().length < 3 && (
-                    <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg animate-fade-in">
-                      ✏️ اكتب 3 حروف على الأقل لتشغيل البحث
-                    </span>
+                        {/* Notice when typing less than 3 characters */}
+                        {searchQuery.trim().length > 0 && searchQuery.trim().length < 3 && (
+                          <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg animate-fade-in">
+                            ✏️ اكتب 3 حروف على الأقل لتشغيل البحث
+                          </span>
+                        )}
+                      </div>
+                    </motion.div>
                   )}
-                </div>
+                </AnimatePresence>
 
                 {/* Results count banner when valid search is active */}
                 {searchQuery.trim().length >= 3 && (
@@ -1893,10 +1972,10 @@ export default function App() {
                       </span>
                       <span>
                         {filteredBenefits.length === 1 
-                          ? 'فائدة' 
+                          ? (isExactSearchMatch ? 'فائدة مطابقة' : 'فائدة مقاربة')
                           : (filteredBenefits.length >= 3 && filteredBenefits.length <= 10) 
-                            ? 'فوائد' 
-                            : 'فائدة'} مطابقة
+                            ? (isExactSearchMatch ? 'فوائد مطابقة' : 'فوائد مقاربة')
+                            : (isExactSearchMatch ? 'فائدة مطابقة' : 'فائدة مقاربة')}
                       </span>
                       <span className="text-[10px] text-brand-gold-dark bg-brand-gold/10 px-1.5 py-0.5 rounded-md mr-1">
                         {isFullTextSearch ? 'بحث شامل' : 'بحث سريع'}
@@ -1904,7 +1983,11 @@ export default function App() {
                     </div>
                     
                     <button
-                      onClick={() => setSearchQuery('')}
+                      onClick={() => {
+                        setSearchQuery('');
+                        setIsSearchFocused(false);
+                        searchInputRef.current?.blur();
+                      }}
                       className="text-red-650 hover:text-red-800 font-bold transition-colors cursor-pointer"
                     >
                       إلغاء البحث ✕

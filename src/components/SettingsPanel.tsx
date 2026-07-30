@@ -1,8 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Download, Upload, Cloud, RefreshCw, Bell, User, Mail, ShieldCheck, ExternalLink, HelpCircle, Check, AlertTriangle, Play, Smartphone, Copy, Key, Lock, Unlock, Trash2, FolderPlus, FolderSync, X, Wifi, Bluetooth, Radio, Activity, CheckCircle, XCircle, ChevronDown, Eye } from 'lucide-react';
+import { Download, Upload, Cloud, RefreshCw, Bell, User, Mail, ShieldCheck, ExternalLink, HelpCircle, Check, AlertTriangle, Play, Smartphone, Copy, Key, Lock, Unlock, Trash2, FolderPlus, FolderSync, X, Wifi, Bluetooth, Radio, Activity, CheckCircle, XCircle, ChevronDown, Eye, Tag, MessageCircle } from 'lucide-react';
 import { AppSettings, Benefit, ScientificQuery, CATEGORIES } from '../types';
-import { exportBenefitsToPDF, formatToHijriAndGregorian, createBackupDataString } from '../utils';
+import { exportBenefitsToPDF, formatToHijriAndGregorian, createBackupDataString, restoreControlPanelData, saveBackupHistorySafely } from '../utils';
 import { 
   listGoogleDriveBackups, 
   uploadToGoogleDrive, 
@@ -10,6 +10,7 @@ import {
   deleteFromGoogleDrive 
 } from '../utils/googleDrive';
 import { AppLogo } from './AppLogo';
+import { RequestCodeModal } from './RequestCodeModal';
 import { getApiUrl } from '../utils/api';
 
 const ENCRYPT_MAP: Record<string, string> = {
@@ -205,9 +206,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [pdfCategorySelect, setPdfCategorySelect] = useState<string>('all');
 
   // Foldable Accordion Section States (Default folded/closed)
+  const [isPwaBannerOpen, setIsPwaBannerOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isBackupOpen, setIsBackupOpen] = useState(false);
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
+  const [isPwaGuideOpen, setIsPwaGuideOpen] = useState(false);
 
   // Online Activation States (reconnect-free offline storage once validated)
   const [isActivated, setIsActivated] = useState<boolean>(() => {
@@ -271,6 +274,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   }, [userEmail]);
 
 
+  const [showRequestCodeModal, setShowRequestCodeModal] = useState(false);
   const [showDemoKeys, setShowDemoKeys] = useState(false);
   const [demoKeys] = useState<string[]>([
     "ABU-OSID-PREMIUM-1111",
@@ -311,6 +315,32 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   React.useEffect(() => {
     localStorage.setItem('abuosid_admin_keys_list', JSON.stringify(adminKeysList));
+    
+    // Automatically recalculate and persist derived key statistics
+    const keysArray = Object.values(adminKeysList) as any[];
+    const usedCount = keysArray.filter(k => k.used).length;
+    const freeCount = keysArray.filter(k => !k.used).length;
+    const totalCount = Object.keys(adminKeysList).length;
+
+    setAdminStats(prev => {
+      const current = prev || {
+        totalVisitors: 1,
+        totalSubscribers: usedCount,
+        totalFreeUsers: 0,
+        totalKeys: totalCount,
+        usedKeys: usedCount,
+        freeKeys: freeCount,
+      };
+      const updated = {
+        ...current,
+        totalKeys: totalCount,
+        usedKeys: usedCount,
+        freeKeys: freeCount,
+        totalSubscribers: Math.max(current.totalSubscribers || 0, usedCount),
+      };
+      localStorage.setItem('abuosid_admin_stats', JSON.stringify(updated));
+      return updated;
+    });
   }, [adminKeysList]);
 
   const [adminStats, setAdminStats] = useState<{
@@ -328,6 +358,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       return null;
     }
   });
+
+  React.useEffect(() => {
+    if (adminStats) {
+      localStorage.setItem('abuosid_admin_stats', JSON.stringify(adminStats));
+    }
+  }, [adminStats]);
   const [newKeyNote, setNewKeyNote] = useState('');
   const [isGeneratingKey, setIsGeneratingKey] = useState(false);
   const [isDeletingKey, setIsDeletingKey] = useState<string | null>(null);
@@ -847,7 +883,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       const dataStr = createBackupDataString(benefits, queries, settings.programmerName || '');
       const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
       
-      const exportFileDefaultName = `فوائد_أبي_أسيد_احتياطي_${new Date().toISOString().split('T')[0]}.json`;
+      const exportFileDefaultName = `جامع_الفوائد_احتياطي_${new Date().toISOString().split('T')[0]}.json`;
       
       const linkElement = document.createElement('a');
       linkElement.setAttribute('href', dataUri);
@@ -873,12 +909,23 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             const importedBenefits = parsedData.benefits || [];
             const importedQueries = parsedData.queries || [];
             
+            // Restore control panel, keys board, and stats
+            if (parsedData.controlPanel) {
+              restoreControlPanelData(parsedData);
+              if (parsedData.controlPanel.adminKeysList) {
+                setAdminKeysList(parsedData.controlPanel.adminKeysList);
+              }
+              if (parsedData.controlPanel.adminStats) {
+                setAdminStats(parsedData.controlPanel.adminStats);
+              }
+            }
+
             onImportData({
               benefits: importedBenefits,
               queries: importedQueries,
               programmerName: parsedData.programmerName,
             });
-            showToast(`تمت استعادة البيانات بنجاح! تم دمج ${importedBenefits.length} فائدة و ${importedQueries.length} استشكال.`, 'success');
+            showToast(`تمت استعادة الفوائد ولوحة التحكم وإحصائيات المفاتيح بنجاح! تم دمج ${importedBenefits.length} فائدة و ${importedQueries.length} استشكال.`, 'success');
           } else {
             showToast('ملف النسخة الاحتياطية غير متوافق أو تالف!', 'warning');
           }
@@ -952,6 +999,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 قم بالتنشيط لفتح الميزات الفائقة: تصدير وطباعة الكتب والتقارير العلمية الفاخرة بلا قيود، وتفعيل النسخ الاحتياطي التلقائي والسحابي السلس عبر جوجل درايف ☁️، وتلقي كامل التحديثات المستقبلية المخصصة.
               </p>
 
+              {/* Price Banner Notice */}
+              <div className="p-3.5 bg-gradient-to-r from-amber-50 via-amber-100/60 to-amber-50 border-2 border-brand-gold/40 rounded-2xl flex items-center gap-3 text-amber-950 font-sans shadow-xs">
+                <div className="p-2 bg-brand-gold/20 text-brand-gold-dark rounded-xl shrink-0">
+                  <Tag className="w-5 h-5 text-brand-gold-dark" />
+                </div>
+                <div className="text-xs font-black leading-relaxed text-right flex-1">
+                  <span>تفعيل رمزي وسهل جداً: </span>
+                  <span className="text-brand-emerald-dark underline decoration-brand-gold decoration-2">10 ريال سعودي</span>
+                  <span> فقط (أو </span>
+                  <span className="text-brand-emerald-dark underline decoration-brand-gold decoration-2">1400 ريال يمني</span>
+                  <span>) لتنشيط كافة الميزات مدى الحياة! 🌟</span>
+                </div>
+              </div>
+
               {/* Offline-Only Activation System */}
               <div className="pt-3 border-t border-zinc-200/60 space-y-4">
                 <div className="text-right">
@@ -960,31 +1021,21 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     تنشيط النسخة المدفوعة (أوفلاين بالكامل):
                   </h4>
                   <p className="text-[10px] text-zinc-500 leading-relaxed mt-0.5">
-                    قم بإنشاء رمز تفعيل مخصص لجهازك وإرساله بالبريد الإلكتروني للمطور لتستلم كود التنشيط الخاص بك مباشرة.
+                    قم بإنشاء رمز تفعيل مخصص لجهازك وإرساله عبر الواتساب أو البريد الإلكتروني للمطور لتستلم كود التنشيط الخاص بك مباشرة.
                   </p>
                 </div>
 
                 <div className="space-y-4 max-w-md mx-auto">
                   {/* Step 1: Request Activation Code Button */}
                   <div className="text-center space-y-1">
-                    <a
-                      href={`mailto:abuosid773@gmail.com?subject=طلب تفعيل تطبيق جامع الفوائد عبر الرمز المشفر&body=السلام عليكم ورحمة الله وبركاته،%0D%0A%0D%0Aأرجو منكم تزويدي بمفتاح التفعيل لتطبيق (جامع الفوائد).%0D%0A%0D%0Aالرمز المشفر المخصص لجهازي هو: ${getEncryptedRequestCode(getOrCreateDeviceSeed())}%0D%0A%0D%0Aولكم جزيل الشكر والتقدير.`}
-                      onClick={(e) => {
-                        try {
-                          navigator.clipboard.writeText(getEncryptedRequestCode(getOrCreateDeviceSeed()));
-                          showToast('تم نسخ رمز طلب التفعيل الخاص بك وجاري فتح تطبيق البريد الإلكتروني لإرساله للمطور 📧', 'success');
-                        } catch (err) {
-                          console.warn('Clipboard write failed:', err);
-                        }
-                        // Programmatic fallback redirect to be extremely reliable inside iframes
-                        const mailtoUrl = `mailto:abuosid773@gmail.com?subject=طلب تفعيل تطبيق جامع الفوائد عبر الرمز المشفر&body=السلام عليكم ورحمة الله وبركاته،%0D%0A%0D%0Aأرجو منكم تزويدي بمفتاح التفعيل لتطبيق (جامع الفوائد).%0D%0A%0D%0Aالرمز المشفر المخصص لجهازي هو: ${getEncryptedRequestCode(getOrCreateDeviceSeed())}%0D%0A%0D%0Aولكم جزيل الشكر والتقدير.`;
-                        window.location.href = mailtoUrl;
-                      }}
-                      className="w-full py-3 px-4 bg-white hover:bg-zinc-50 border border-brand-gold/30 text-brand-emerald-dark font-black text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                    <button
+                      type="button"
+                      onClick={() => setShowRequestCodeModal(true)}
+                      className="w-full py-3 px-4 bg-gradient-to-r from-brand-emerald to-brand-emerald-dark text-white hover:opacity-95 font-black text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
                     >
-                      <Mail className="w-4 h-4 text-brand-gold" />
-                      <span>طلب رمز التفعيل الخاص بجهازك 📧</span>
-                    </a>
+                      <Key className="w-4 h-4 text-brand-gold-light" />
+                      <span>طلب رمز التفعيل الخاص بجهازك 🔑</span>
+                    </button>
                     <span className="text-[9px] text-zinc-400 block">
                       (الرمز المشفر التلقائي لجهازك: <span className="font-mono font-bold select-all text-zinc-600 bg-zinc-100 px-1.5 py-0.5 rounded">{getEncryptedRequestCode(getOrCreateDeviceSeed())}</span>)
                     </span>
@@ -1041,6 +1092,59 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* 📱 PWA Install Promotion Box (Sleek Arabic design - Foldable) */}
+      {activeView !== 'print' && (
+        <div className="bg-gradient-to-br from-brand-emerald-dark to-brand-emerald text-white rounded-2xl shadow-lg border border-brand-gold/20 overflow-hidden transition-all">
+          <button
+            type="button"
+            onClick={() => setIsPwaBannerOpen(!isPwaBannerOpen)}
+            className="w-full p-4 sm:p-5 flex items-center justify-between text-right cursor-pointer focus:outline-none select-none hover:bg-white/5 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl select-none">📱</span>
+              <div>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-brand-gold text-white text-[10px] font-bold mb-1">
+                  ✨ متاح الآن للتثبيت الفوري
+                </span>
+                <h3 className="text-sm sm:text-base font-black text-brand-cream">
+                  تثبيت تطبيق جامع الفوائد على الجوال
+                </h3>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-brand-cream/80 font-bold hidden sm:inline">
+                {isPwaBannerOpen ? 'إغلاق' : 'انقر للفتح والتثبيت'}
+              </span>
+              <ChevronDown className={`w-5 h-5 text-brand-gold transition-transform duration-300 ${isPwaBannerOpen ? 'rotate-180' : ''}`} />
+            </div>
+          </button>
+
+          <AnimatePresence>
+            {isPwaBannerOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="px-5 pb-5 pt-2 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4"
+              >
+                <div className="space-y-1.5 text-right flex-1">
+                  <p className="text-xs text-brand-cream/90 leading-relaxed max-w-xl">
+                    يمكنك إضافة اختصار للتطبيق على الشاشة الرئيسية لجوالك وتصفح وقيد الفوائد العلمية والحديثية أوفلاين بالكامل 100% دون الحاجة لسرعة الإنترنت وبشكل أسرع وأسهل!
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onInstallApp}
+                  className="w-full md:w-auto px-5 py-3.5 bg-brand-gold hover:bg-brand-gold-light text-white font-black text-xs rounded-xl shadow-md transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 border border-brand-gold-light z-10 whitespace-nowrap"
+                >
+                  <span>📱 تثبيت تطبيق جامع الفوائد على الجوال</span>
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
 
@@ -1482,32 +1586,34 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
 
               <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
-                {/* Preview Button (Available to ALL users) */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (benefits.length === 0) {
-                      showToast('لا توجد مدونات علمية لتصديرها! يرجى إضافة فائدة أولاً.', 'warning');
-                      return;
-                    }
-                    showToast('جاري فتح معاينة شكل الكتاب العلمي... 👁️', 'info');
-                    exportBenefitsToPDF(
-                      benefits,
-                      pdfStyle,
-                      pdfBookTitle,
-                      pdfAuthorName,
-                      settings.programmerEmail,
-                      includeCover,
-                      pdfCategorySelect,
-                      pdfTheme,
-                      !isActivated // isPreviewOnly if not activated
-                    );
-                  }}
-                  className="px-5 py-2.5 text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto hover:bg-zinc-100 bg-white border border-brand-gold/40 text-brand-emerald-dark"
-                >
-                  <Eye className="w-4 h-4 text-brand-gold" />
-                  <span>معاينة شكل الكتاب (Preview) 👁️</span>
-                </button>
+                {/* Preview Button (Available ONLY to Free / Unactivated users) */}
+                {!isActivated && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (benefits.length === 0) {
+                        showToast('لا توجد مدونات علمية لتصديرها! يرجى إضافة فائدة أولاً.', 'warning');
+                        return;
+                      }
+                      showToast('جاري فتح معاينة شكل الكتاب العلمي... 👁️', 'info');
+                      exportBenefitsToPDF(
+                        benefits,
+                        pdfStyle,
+                        pdfBookTitle,
+                        pdfAuthorName,
+                        settings.programmerEmail,
+                        includeCover,
+                        pdfCategorySelect,
+                        pdfTheme,
+                        true // isPreviewOnly
+                      );
+                    }}
+                    className="px-5 py-2.5 text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto hover:bg-zinc-100 bg-white border border-brand-gold/40 text-brand-emerald-dark"
+                  >
+                    <Eye className="w-4 h-4 text-brand-gold" />
+                    <span>معاينة شكل الكتاب (Preview) 👁️</span>
+                  </button>
+                )}
 
                 {/* PDF Download Button (Gated to Paid Activated Version) */}
                 <button
@@ -1990,7 +2096,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                           onClick={() => {
                             requestConfirm('حذف النسخة 🗑️', 'هل تريد حذف هذه النسخة الاحتياطية من السجل؟', () => {
                               const updatedHistory = backupsHistory.filter(h => h.id !== historyItem.id);
-                              localStorage.setItem('abuosid_backups_history', JSON.stringify(updatedHistory));
+                              saveBackupHistorySafely(updatedHistory);
                               setBackupsHistory(updatedHistory);
                               showToast('تم حذف النسخة الاحتياطية من السجل.', 'info');
                             });
@@ -2652,7 +2758,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         <div className="bg-gradient-to-l from-brand-emerald-dark to-brand-emerald rounded-2xl p-6 text-white border border-brand-gold/20 custom-shadow">
           <h3 className="text-base font-bold text-brand-gold-light border-b border-white/10 pb-3 mb-4 flex items-center gap-2">
             <User className="w-5 h-5 text-brand-gold-light" />
-            معلومات التطبيق والمبرمج المعتمد
+            معلومات التطبيق
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
@@ -2669,7 +2775,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <User className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-xs text-zinc-300">اسم مطور البرنامج</p>
+                  <p className="text-xs text-zinc-300">مطور البرنامج</p>
                   <p className="text-sm font-bold text-white">أبو أُسيد</p>
                 </div>
               </div>
@@ -2697,12 +2803,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </p>
               <div className="text-[10px] text-zinc-300 pt-1.5 border-t border-white/5 flex items-center justify-between">
                 <span>الإصدار الحالي: v1.0.0</span>
-                <span>بكل فخر بالوطن العربي 🇾🇪</span>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Request Activation Code Modal (WhatsApp & Email options) */}
+      <RequestCodeModal
+        isOpen={showRequestCodeModal}
+        onClose={() => setShowRequestCodeModal(false)}
+        showToast={showToast}
+      />
 
       {/* Custom Confirmation Modal */}
       {confirmModal && (

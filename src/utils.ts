@@ -1300,6 +1300,60 @@ export function getHighlightSpans(originalText: string, query: string): { start:
 }
 
 /**
+ * Safely saves backup history items into localStorage while strictly enforcing quota safety.
+ * Strips nested recursive payloads and prunes older entries if browser localStorage quota is reached.
+ */
+export function saveBackupHistorySafely(history: any[]): void {
+  if (typeof window === 'undefined') return;
+  if (!Array.isArray(history)) return;
+
+  // Clean and sanitize each entry so no item contains nested backupsHistory recursively
+  const sanitized = history.map(item => {
+    let cleanData = item.data;
+    if (cleanData && typeof cleanData === 'string') {
+      try {
+        const parsed = JSON.parse(cleanData);
+        if (parsed && parsed.controlPanel && parsed.controlPanel.backupsHistory) {
+          delete parsed.controlPanel.backupsHistory;
+          cleanData = JSON.stringify(parsed);
+        }
+      } catch (e) {
+        // ignore parse error if raw text
+      }
+    }
+    return {
+      id: item.id || `backup-${Date.now()}`,
+      timestamp: item.timestamp || Date.now(),
+      trigger: item.trigger || 'manual',
+      benefitsCount: item.benefitsCount || 0,
+      queriesCount: item.queriesCount || 0,
+      data: cleanData,
+      code: item.code,
+      email: item.email
+    };
+  });
+
+  // Try saving with different pruning levels to guarantee no QuotaExceededError
+  const attempts = [
+    sanitized.slice(0, 5),
+    sanitized.slice(0, 3),
+    sanitized.slice(0, 2),
+    sanitized.slice(0, 1),
+    sanitized.slice(0, 3).map((it, idx) => (idx === 0 ? it : { ...it, data: '' })),
+    sanitized.slice(0, 1).map(it => ({ ...it, data: '' }))
+  ];
+
+  for (const list of attempts) {
+    try {
+      localStorage.setItem('abuosid_backups_history', JSON.stringify(list));
+      return; // Successfully saved within quota!
+    } catch (e) {
+      console.warn('[جامع الفوائد] Quota error saving backup history, attempting smaller batch...', e);
+    }
+  }
+}
+
+/**
  * Creates a comprehensive backup data string containing benefits, queries, programmer name,
  * and all associated dashboard / control panel settings and statistics.
  */
@@ -1316,7 +1370,10 @@ export function createBackupDataString(benefits: any[], queries: any[], programm
         activationKey: localStorage.getItem('abuosid_activation_key') || undefined,
         deviceSeed: localStorage.getItem('abuosid_device_seed') || undefined,
         freePdfCount: localStorage.getItem('abuosid_free_pdf_count') ? parseInt(localStorage.getItem('abuosid_free_pdf_count')!, 10) : undefined,
-        ocrFreeUsesCount: localStorage.getItem('abuosid_ocr_free_uses_count') ? parseInt(localStorage.getItem('abuosid_ocr_free_uses_count')!, 10) : undefined
+        ocrFreeUsesCount: localStorage.getItem('abuosid_ocr_free_uses_count') ? parseInt(localStorage.getItem('abuosid_ocr_free_uses_count')!, 10) : undefined,
+        customCategories: localStorage.getItem('abuosid_custom_categories_list_v1') ? JSON.parse(localStorage.getItem('abuosid_custom_categories_list_v1')!) : undefined,
+        userEmail: localStorage.getItem('abuosid_user_email') || undefined,
+        pdfAuthorName: localStorage.getItem('abuosid_pdf_author_name') || undefined,
       };
     } catch (e) {
       console.error("Failed to read control panel values from localStorage for backup:", e);
@@ -1365,6 +1422,18 @@ export function restoreControlPanelData(parsedBackup: any): void {
       }
       if (cp.ocrFreeUsesCount !== undefined) {
         localStorage.setItem('abuosid_ocr_free_uses_count', String(cp.ocrFreeUsesCount));
+      }
+      if (cp.backupsHistory !== undefined && Array.isArray(cp.backupsHistory)) {
+        saveBackupHistorySafely(cp.backupsHistory);
+      }
+      if (cp.customCategories !== undefined) {
+        localStorage.setItem('abuosid_custom_categories_list_v1', JSON.stringify(cp.customCategories));
+      }
+      if (cp.userEmail !== undefined) {
+        localStorage.setItem('abuosid_user_email', cp.userEmail);
+      }
+      if (cp.pdfAuthorName !== undefined) {
+        localStorage.setItem('abuosid_pdf_author_name', cp.pdfAuthorName);
       }
     }
   } catch (e) {

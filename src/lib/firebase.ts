@@ -1,4 +1,5 @@
 // Clean Local & Offline Storage Engine (Firebase Free)
+import { saveBackupHistorySafely } from '../utils';
 
 export const getDb = () => null;
 export const db = null;
@@ -42,7 +43,7 @@ export const saveBackupToFirebase = async (
     const existing = localStorage.getItem('abuosid_backups_history');
     const list = existing ? JSON.parse(existing) : [];
     list.unshift(backupDoc);
-    localStorage.setItem('abuosid_backups_history', JSON.stringify(list.slice(0, 20)));
+    saveBackupHistorySafely(list);
   } catch (e) {
     console.warn("Local storage write error:", e);
   }
@@ -82,7 +83,7 @@ export const deleteBackupFromFirebase = async (backupId: string): Promise<void> 
     if (!existing) return;
     const list = JSON.parse(existing);
     const updated = list.filter((b: any) => b.id !== backupId);
-    localStorage.setItem('abuosid_backups_history', JSON.stringify(updated));
+    saveBackupHistorySafely(updated);
   } catch (e) {
     console.warn("Failed to delete backup:", e);
   }

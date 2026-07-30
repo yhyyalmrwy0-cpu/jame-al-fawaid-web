@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShieldCheck, Mail, Sparkles, BookOpen, Cloud, Share2, Check, X, Key, Camera } from 'lucide-react';
+import { ShieldCheck, Mail, Sparkles, BookOpen, Cloud, Share2, Check, X, Key, Camera, Tag, MessageCircle } from 'lucide-react';
+import { RequestCodeModal } from './RequestCodeModal';
 
 const ENCRYPT_MAP: Record<string, string> = {
   'A': 'X', 'B': 'Y', 'C': 'Z', 'D': 'W', 'E': 'V', 'F': 'U', 'G': 'T', 'H': 'S', 'I': 'R', 'J': 'Q',
@@ -40,6 +41,8 @@ export const PremiumPromoModal: React.FC<PremiumPromoModalProps> = ({
   showToast,
   noticeMessage,
 }) => {
+  const [showRequestCodeModal, setShowRequestCodeModal] = useState(false);
+
   if (!isOpen) return null;
 
   const handleCopyEmail = () => {
@@ -177,6 +180,20 @@ export const PremiumPromoModal: React.FC<PremiumPromoModalProps> = ({
               </div>
             </div>
 
+            {/* Price Banner Highlight */}
+            <div className="p-3.5 bg-gradient-to-r from-amber-50 via-amber-100/60 to-amber-50 border-2 border-brand-gold/40 rounded-2xl flex items-center gap-3 text-amber-950 font-sans shadow-xs">
+              <div className="p-2 bg-brand-gold/20 text-brand-gold-dark rounded-xl shrink-0">
+                <Tag className="w-5 h-5 text-brand-gold-dark" />
+              </div>
+              <div className="text-xs font-black leading-relaxed text-right flex-1">
+                <span>تفعيل رمزي وسهل جداً: </span>
+                <span className="text-brand-emerald-dark underline decoration-brand-gold decoration-2">10 ريال سعودي</span>
+                <span> فقط (أو </span>
+                <span className="text-brand-emerald-dark underline decoration-brand-gold decoration-2">1400 ريال يمني</span>
+                <span>) لتنشيط كافة الميزات مدى الحياة! 🌟</span>
+              </div>
+            </div>
+
             {/* Call to Action and Activation Instructions */}
             <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 text-right space-y-3">
               <span className="text-xs font-black text-brand-emerald-dark block flex items-center gap-1.5">
@@ -184,34 +201,17 @@ export const PremiumPromoModal: React.FC<PremiumPromoModalProps> = ({
                 طريقة التفعيل والاشتراك السريع:
               </span>
               <p className="text-xs text-zinc-600 leading-relaxed">
-                التفعيل سهل جداً ويدوي! للحصول على كود التفعيل المخصص لك مدى الحياة، يرجى التواصل مع المطور عبر البريد الإلكتروني مباشرة، وسيتم تزويدك بمفتاح التفعيل فوراً:
+                التفعيل سهل جداً! اضغط على الزر أدناه لاختيار التواصل عبر <strong className="text-emerald-700 font-bold">الواتساب</strong> أو <strong className="text-brand-emerald font-bold">البريد الإلكتروني</strong> لإرسال رمز جهازك واستلام كود التنشيط فوراً:
               </p>
               
               <div className="flex flex-col sm:flex-row gap-2 pt-1.5">
-                <a
-                  href={mailtoUrl}
-                  onClick={(e) => {
-                    try {
-                      navigator.clipboard.writeText(requestCode);
-                      showToast('تم نسخ رمز طلب التفعيل الخاص بك وجاري فتح تطبيق البريد الإلكتروني لإرساله للمطور 📧', 'success');
-                    } catch (err) {
-                      console.warn('Clipboard write failed:', err);
-                    }
-                    // Programmatic fallback redirect to be extremely reliable inside iframes
-                    window.location.href = mailtoUrl;
-                  }}
-                  className="px-4 py-2.5 bg-brand-emerald hover:bg-brand-emerald-dark text-white font-bold text-xs rounded-xl flex-1 flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
-                >
-                  <Mail className="w-4 h-4" />
-                  <span>مراسلة المطور عبر البريد الإلكتروني</span>
-                </a>
-
                 <button
                   type="button"
-                  onClick={handleCopyEmail}
-                  className="px-3 py-2.5 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  onClick={() => setShowRequestCodeModal(true)}
+                  className="px-4 py-3 bg-gradient-to-r from-brand-emerald to-brand-emerald-dark text-white font-black text-xs rounded-xl flex-1 flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md hover:scale-[1.01] active:scale-[0.99]"
                 >
-                  <span>abuosid773@gmail.com</span>
+                  <Key className="w-4 h-4 text-brand-gold-light" />
+                  <span>طلب رمز التفعيل (عبر الواتساب أو البريد) 🔑</span>
                 </button>
               </div>
             </div>
@@ -228,6 +228,13 @@ export const PremiumPromoModal: React.FC<PremiumPromoModalProps> = ({
           </div>
         </motion.div>
       </div>
+
+      {/* Request Activation Code Popup */}
+      <RequestCodeModal
+        isOpen={showRequestCodeModal}
+        onClose={() => setShowRequestCodeModal(false)}
+        showToast={showToast}
+      />
     </AnimatePresence>
   );
 };
