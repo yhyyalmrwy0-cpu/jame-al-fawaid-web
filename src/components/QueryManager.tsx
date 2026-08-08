@@ -578,7 +578,7 @@ export const QueryManager: React.FC<QueryManagerProps> = ({
                   <h4 className="text-base font-bold text-brand-emerald-dark font-sans leading-snug">
                     {q.title}
                   </h4>
-                  <p className="text-sm text-zinc-700 leading-relaxed font-serif whitespace-pre-line">
+                  <p className="text-sm text-zinc-700 leading-relaxed benefit-text font-normal whitespace-pre-line">
                     {q.content}
                   </p>
                 </div>
@@ -667,7 +667,7 @@ export const QueryManager: React.FC<QueryManagerProps> = ({
                         <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                         التحقيق والمخرج العلمي المعتمد:
                       </h5>
-                      <p className="text-xs sm:text-sm text-zinc-800 leading-relaxed font-serif whitespace-pre-line">
+                      <p className="text-xs sm:text-sm text-zinc-800 leading-relaxed benefit-text font-normal whitespace-pre-line">
                         {q.resolution}
                       </p>
                     </div>

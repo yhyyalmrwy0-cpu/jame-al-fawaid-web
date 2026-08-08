@@ -121,7 +121,7 @@ export const BenefitDetailModal: React.FC<BenefitDetailModalProps> = ({
             </div>
 
             {/* Main Full Text Box */}
-            <div className="p-4 sm:p-5 bg-brand-beige/30 rounded-2xl border border-brand-cream/40 text-base text-zinc-800 font-serif leading-loose whitespace-pre-line select-text max-h-96 overflow-y-auto shadow-inner">
+            <div className="p-4 sm:p-5 bg-brand-beige/30 rounded-2xl border border-brand-cream/40 text-[15px] sm:text-base text-zinc-800 benefit-text font-normal leading-loose whitespace-pre-line select-none max-h-96 overflow-y-auto shadow-inner">
               {benefit.content}
             </div>
           </div>

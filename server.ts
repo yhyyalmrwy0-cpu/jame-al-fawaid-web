@@ -202,13 +202,17 @@ const PORT = 3000;
 
     if (firebaseConfig) {
       const firebaseApp = initializeApp(firebaseConfig);
-      db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || firebaseConfig.projectId || undefined);
+      const dbId = (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== firebaseConfig.projectId) 
+        ? firebaseConfig.firestoreDatabaseId 
+        : undefined;
+      db = dbId ? getFirestore(firebaseApp, dbId) : getFirestore(firebaseApp);
       console.log("Firebase initialized successfully on server.");
     } else {
       console.warn("No Firebase configuration found (either firebase-applet-config.json or Environment Variables).");
     }
   } catch (err) {
     console.error("Failed to initialize Firebase on server:", err);
+    db = null;
   }
 
   // Pre-seed initial keys if they do not exist
@@ -239,8 +243,9 @@ const PORT = 3000;
         const indexDocRef = doc(db, "app_state", "keys_index");
         await setDoc(indexDocRef, { keys: Object.keys(initialKeys) });
       }
-    } catch (error) {
-      console.error("Error seeding initial keys in Firestore:", error);
+    } catch (error: any) {
+      console.warn("Firestore unavailable or not configured. Falling back to local offline storage mode:", error?.message || error);
+      db = null; // Disable Firestore and rely on local storage engine
     }
   }
 
@@ -1312,18 +1317,9 @@ const PORT = 3000;
     }
   });
 
-  // Global JSON Error Handler to prevent Express crashing or sending HTML pages in development
-  app.use((err: any, req: any, res: any, next: any) => {
-    console.error("خطأ السيرفر المحلي (Global Error Handler):", err);
-    res.status(err.status || err.statusCode || 500).json({
-      success: false,
-      message: err.message || "حدث خطأ داخلي غير متوقع في الخادم المحلي."
-    });
-  });
-
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    (async () => {
+  async function startServer() {
+    // Vite middleware for development
+    if (process.env.NODE_ENV !== "production") {
       try {
         const vite = await createViteServer({
           server: { middlewareMode: true },
@@ -1333,19 +1329,33 @@ const PORT = 3000;
       } catch (e) {
         console.error("Failed to initialize Vite development server:", e);
       }
-    })();
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+    } else {
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    }
+
+    // Global JSON Error Handler to prevent Express crashing or sending HTML pages in development
+    app.use((err: any, req: any, res: any, next: any) => {
+      console.error("خطأ السيرفر المحلي (Global Error Handler):", err);
+      if (res.headersSent) {
+        return next(err);
+      }
+      res.status(err.status || err.statusCode || 500).json({
+        success: false,
+        message: err.message || "حدث خطأ داخلي غير متوقع في الخادم المحلي."
+      });
     });
+
+    if (!process.env.VERCEL) {
+      app.listen(PORT, "0.0.0.0", () => {
+        console.log(`Server running on http://localhost:${PORT}`);
+      });
+    }
   }
 
-if (!process.env.VERCEL) {
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
-}
+  startServer();
 
 export default app;

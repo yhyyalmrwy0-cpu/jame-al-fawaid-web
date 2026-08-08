@@ -633,7 +633,7 @@ export const BenefitForm: React.FC<BenefitFormProps> = ({
               onChange={(e) => setContent(e.target.value)}
               placeholder="اكتب الفائدة العلمية بالتفصيل هنا..."
               style={{ minHeight: '180px', maxHeight: '280px' }}
-              className="w-full pr-4 pl-12 pt-3 pb-10 rounded-xl border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-serif text-base text-zinc-800 bg-zinc-50/50 leading-relaxed resize-y overflow-y-auto"
+              className="w-full pr-4 pl-12 pt-3 pb-10 rounded-xl border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all benefit-text text-[15px] sm:text-base text-zinc-800 bg-zinc-50/50 leading-relaxed resize-y overflow-y-auto font-normal"
             />
 
             {/* Voice Mic Button */}

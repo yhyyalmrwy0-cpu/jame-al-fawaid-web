@@ -223,7 +223,7 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
 
           {/* Summarized preview text if collapsed */}
           {!isExpanded && (
-            <p className="text-sm text-zinc-600 line-clamp-2 leading-relaxed font-serif pt-1">
+            <p className="text-sm text-zinc-600 line-clamp-2 leading-relaxed benefit-text font-normal pt-1">
               {highlightText(benefit.content, searchQuery)}
             </p>
           )}
@@ -238,7 +238,7 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
                 className="!overflow-visible pt-2 border-t border-brand-cream/20 mt-3"
                 style={{ overflow: 'visible' }}
               >
-                <p className="text-base text-zinc-800 font-serif leading-loose whitespace-pre-line bg-brand-beige/40 p-4 rounded-xl border border-brand-cream/30 select-text max-h-80 sm:max-h-96 overflow-y-auto">
+                <p className="text-[15px] sm:text-base text-zinc-800 benefit-text font-normal leading-loose whitespace-pre-line bg-brand-beige/40 p-4 rounded-xl border border-brand-cream/30 select-none max-h-80 sm:max-h-96 overflow-y-auto">
                   {highlightText(benefit.content, searchQuery)}
                 </p>
 

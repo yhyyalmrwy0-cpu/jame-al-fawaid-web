@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { BookOpen, HelpCircle, FolderSync, PlusCircle, Search, Heart, SlidersHorizontal, Grid, Star, Sparkles, Layers, Eye, ArrowUp, X, Printer, Download, Smartphone, Folder, FolderPlus, Trash2, FolderMinus, Wifi, Bluetooth, Radio, Activity, Loader2, CheckCircle, XCircle, ChevronDown } from 'lucide-react';
+import { BookOpen, HelpCircle, FolderSync, PlusCircle, Plus, Search, Heart, SlidersHorizontal, Grid, Star, Sparkles, Layers, Eye, ArrowUp, X, Printer, Download, Smartphone, Folder, FolderPlus, Trash2, FolderMinus, Wifi, Bluetooth, Radio, Activity, Loader2, CheckCircle, XCircle, ChevronDown, Menu } from 'lucide-react';
 
 // Import Types
 import { Benefit, ScientificQuery, AppSettings, CATEGORIES, CategoryType } from './types';
@@ -10,6 +10,7 @@ import { searchBenefitsFTS, syncBenefitsFTS } from './lib/ftsEngine';
 
 // Import Components
 import { Header } from './components/Header';
+import { Sidebar } from './components/Sidebar';
 import { BenefitForm } from './components/BenefitForm';
 import { BenefitCard } from './components/BenefitCard';
 import { QueryManager } from './components/QueryManager';
@@ -116,6 +117,9 @@ const STARTER_QUERIES: ScientificQuery[] = [
 export default function App() {
   // Navigation tabs state
   const [activeTab, setActiveTab] = useState<'home' | 'add' | 'queries' | 'settings' | 'print'>('home');
+
+  // Sidebar Drawer state
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Back to top button visibility state
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -725,6 +729,11 @@ export default function App() {
   const [prefilledBenefit, setPrefilledBenefit] = useState<Omit<Benefit, 'id' | 'views' | 'isFavorite' | 'createdAt'> | null>(null);
   const [convertingQueryId, setConvertingQueryId] = useState<string | null>(null);
   const [isDoubtBannerDismissed, setIsDoubtBannerDismissed] = useState(false);
+
+  // Automatically scroll page to the top whenever activeTab or editing status changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [activeTab, editingBenefit]);
 
   // Record visit on startup once per browser session
   useEffect(() => {
@@ -1457,7 +1466,19 @@ export default function App() {
   return (
     <div className="min-h-screen bg-brand-beige flex flex-col pb-24 text-right">
 
-
+      {/* Sidebar Drawer */}
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        onOpen={() => setIsSidebarOpen(true)}
+        activeTab={activeTab}
+        onSelectTab={(tab) => {
+          setEditingBenefit(null);
+          setActiveTab(tab);
+        }}
+        totalBenefits={benefits.length}
+        totalQueries={queries.length}
+      />
 
       {/* Real-time Android top sliding notification */}
       <AnimatePresence>
@@ -1559,6 +1580,7 @@ export default function App() {
                 settings={settings}
                 onUpdateSettings={handleUpdateSettings}
                 onUnlockControlPanel={handleToggleControlPanel}
+                onOpenSidebar={() => setIsSidebarOpen(true)}
               />
 
               {/* Startup Non-Intrusive Doubt Banner */}
@@ -2166,7 +2188,19 @@ export default function App() {
       </main>
 
       {/* Styled Android Bottom Navigation Menu */}
-      <nav className="fixed bottom-0 left-0 right-0 h-20 bg-white border-t border-zinc-200/80 shadow-2xl z-40 flex items-center justify-around px-4">
+      <nav className="fixed bottom-0 left-0 right-0 h-20 bg-white border-t border-zinc-200/80 shadow-2xl z-40 flex items-center justify-around px-2 sm:px-4">
+        {/* Sidebar Drawer Toggle Button (First on the Right in RTL) */}
+        <button
+          onClick={() => setIsSidebarOpen(true)}
+          className="flex flex-col items-center justify-center gap-1.5 w-16 py-2 transition-all cursor-pointer text-brand-emerald-dark hover:text-brand-emerald group"
+          title="فتح القائمة الجانبية الكاملة"
+        >
+          <div className="p-1.5 rounded-xl transition-all group-hover:bg-brand-cream text-brand-gold bg-brand-gold/10">
+            <Menu className="w-5.5 h-5.5" />
+          </div>
+          <span className="text-[10px] font-black font-sans text-brand-emerald-dark">القائمة</span>
+        </button>
+
         {/* Navigation Home */}
         <button
           onClick={() => {
@@ -2174,7 +2208,7 @@ export default function App() {
             setActiveTab('home');
           }}
           className={`flex flex-col items-center justify-center gap-1.5 w-16 py-2 transition-all cursor-pointer ${
-            activeTab === 'home' ? 'text-brand-emerald scale-105' : 'text-zinc-400 hover:text-zinc-600'
+            activeTab === 'home' ? 'text-brand-emerald scale-105 font-bold' : 'text-zinc-400 hover:text-zinc-600'
           }`}
         >
           <div className={`p-1.5 rounded-xl transition-all ${
@@ -2185,24 +2219,6 @@ export default function App() {
           <span className="text-[10px] font-bold font-sans">الفوائد</span>
         </button>
 
-        {/* Navigation Add Benefit */}
-        <button
-          onClick={() => {
-            setEditingBenefit(null);
-            setActiveTab('add');
-          }}
-          className={`flex flex-col items-center justify-center gap-1.5 w-16 py-2 transition-all cursor-pointer ${
-            activeTab === 'add' ? 'text-brand-emerald scale-105' : 'text-zinc-400 hover:text-zinc-600'
-          }`}
-        >
-          <div className={`p-1.5 rounded-xl transition-all ${
-            activeTab === 'add' ? 'bg-brand-cream text-brand-emerald-dark' : ''
-          }`}>
-            <PlusCircle className="w-5.5 h-5.5" />
-          </div>
-          <span className="text-[10px] font-bold font-sans">تدوين فائدة</span>
-        </button>
-
         {/* Navigation Queries / Doubts */}
         <button
           onClick={() => {
@@ -2210,7 +2226,7 @@ export default function App() {
             setActiveTab('queries');
           }}
           className={`flex flex-col items-center justify-center gap-1.5 w-16 py-2 transition-all cursor-pointer ${
-            activeTab === 'queries' ? 'text-brand-emerald scale-105' : 'text-zinc-400 hover:text-zinc-600'
+            activeTab === 'queries' ? 'text-brand-emerald scale-105 font-bold' : 'text-zinc-400 hover:text-zinc-600'
           }`}
         >
           <div className={`p-1.5 rounded-xl transition-all ${
@@ -2228,7 +2244,7 @@ export default function App() {
             setActiveTab('print');
           }}
           className={`flex flex-col items-center justify-center gap-1.5 w-16 py-2 transition-all cursor-pointer ${
-            activeTab === 'print' ? 'text-brand-emerald scale-105' : 'text-zinc-400 hover:text-zinc-600'
+            activeTab === 'print' ? 'text-brand-emerald scale-105 font-bold' : 'text-zinc-400 hover:text-zinc-600'
           }`}
         >
           <div className={`p-1.5 rounded-xl transition-all ${
@@ -2246,7 +2262,7 @@ export default function App() {
             setActiveTab('settings');
           }}
           className={`flex flex-col items-center justify-center gap-1.5 w-16 py-2 transition-all cursor-pointer ${
-            activeTab === 'settings' ? 'text-brand-emerald scale-105' : 'text-zinc-400 hover:text-zinc-600'
+            activeTab === 'settings' ? 'text-brand-emerald scale-105 font-bold' : 'text-zinc-400 hover:text-zinc-600'
           }`}
         >
           <div className={`p-1.5 rounded-xl transition-all ${
@@ -2440,7 +2456,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Floating Back to Top Button */}
+      {/* Floating Back to Top Button (Left side) */}
       <AnimatePresence>
         {showScrollTop && (
           <motion.button
@@ -2457,6 +2473,47 @@ export default function App() {
           >
             <ArrowUp className="w-5 h-5" />
           </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* Floating Action Buttons (Right side): Search Button & Add (+) Button directly under it (Shown only on Home/Benefits tab) */}
+      <AnimatePresence>
+        {activeTab === 'home' && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: 10 }}
+            className="fixed bottom-24 right-6 z-40 flex flex-col items-center gap-3"
+          >
+            {/* Floating Search Button */}
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={handleFloatingSearchClick}
+              className="w-12 h-12 bg-white hover:bg-brand-cream text-brand-emerald-dark rounded-full shadow-xl border-2 border-brand-emerald/30 cursor-pointer flex items-center justify-center transition-all active:scale-95 group"
+              title="البحث في الفوائد"
+              aria-label="البحث في الفوائد"
+            >
+              <Search className="w-5.5 h-5.5 text-brand-emerald group-hover:scale-110 transition-transform" />
+            </motion.button>
+
+            {/* Floating Add Benefit Button (+) directly under the Search button */}
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => {
+                setEditingBenefit(null);
+                setPrefilledBenefit(null);
+                setConvertingQueryId(null);
+                setActiveTab('add');
+              }}
+              className="w-14 h-14 bg-gradient-to-br from-brand-emerald-dark via-brand-emerald to-emerald-800 hover:from-brand-emerald hover:to-emerald-700 text-white rounded-full shadow-2xl border-2 border-brand-gold/60 cursor-pointer flex items-center justify-center transition-all active:scale-95 group ring-4 ring-brand-emerald/10"
+              title="تدوين فائدة جديدة"
+              aria-label="تدوين فائدة جديدة"
+            >
+              <Plus className="w-7 h-7 text-brand-gold-light group-hover:rotate-90 transition-transform duration-300" />
+            </motion.button>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -2660,20 +2717,6 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
-
-      {/* Floating Search Button */}
-      <motion.button
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        onClick={handleFloatingSearchClick}
-        className="fixed bottom-24 right-6 z-40 bg-white/95 backdrop-blur-sm hover:bg-zinc-50 text-brand-emerald hover:text-brand-emerald-dark p-3.5 rounded-full shadow-lg border border-zinc-250 cursor-pointer flex items-center justify-center transition-all focus:outline-none"
-        title="البحث السريع 🔍"
-        aria-label="البحث السريع"
-      >
-        <Search className="w-5.5 h-5.5 text-brand-emerald" />
-      </motion.button>
 
       {/* Screen Shading / Dimming Overlay for focused benefit */}
       <AnimatePresence>

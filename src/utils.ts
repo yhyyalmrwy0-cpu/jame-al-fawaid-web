@@ -1366,9 +1366,8 @@ export function createBackupDataString(benefits: any[], queries: any[], programm
         adminKeysList: localStorage.getItem('abuosid_admin_keys_list') ? JSON.parse(localStorage.getItem('abuosid_admin_keys_list')!) : undefined,
         adminStats: localStorage.getItem('abuosid_admin_stats') ? JSON.parse(localStorage.getItem('abuosid_admin_stats')!) : undefined,
         controlPanelVisible: localStorage.getItem('abuosid_control_panel_visible') === 'true',
-        appActivated: localStorage.getItem('abuosid_app_activated') === 'true',
-        activationKey: localStorage.getItem('abuosid_activation_key') || undefined,
-        deviceSeed: localStorage.getItem('abuosid_device_seed') || undefined,
+        // EXCLUDED: appActivated, activationKey, and deviceSeed are strictly excluded from backups
+        // so activation state and paid keys cannot be transferred or bypassed via backup files.
         freePdfCount: localStorage.getItem('abuosid_free_pdf_count') ? parseInt(localStorage.getItem('abuosid_free_pdf_count')!, 10) : undefined,
         ocrFreeUsesCount: localStorage.getItem('abuosid_ocr_free_uses_count') ? parseInt(localStorage.getItem('abuosid_ocr_free_uses_count')!, 10) : undefined,
         customCategories: localStorage.getItem('abuosid_custom_categories_list_v1') ? JSON.parse(localStorage.getItem('abuosid_custom_categories_list_v1')!) : undefined,
@@ -1408,15 +1407,8 @@ export function restoreControlPanelData(parsedBackup: any): void {
       if (cp.controlPanelVisible !== undefined) {
         localStorage.setItem('abuosid_control_panel_visible', String(cp.controlPanelVisible));
       }
-      if (cp.appActivated !== undefined) {
-        localStorage.setItem('abuosid_app_activated', String(cp.appActivated));
-      }
-      if (cp.activationKey !== undefined) {
-        localStorage.setItem('abuosid_activation_key', cp.activationKey);
-      }
-      if (cp.deviceSeed !== undefined) {
-        localStorage.setItem('abuosid_device_seed', cp.deviceSeed);
-      }
+      // EXCLUDED: appActivated, activationKey, and deviceSeed are never restored from backup files
+      // to guarantee that restoring a backup on an unactivated device does not activate paid mode.
       if (cp.freePdfCount !== undefined) {
         localStorage.setItem('abuosid_free_pdf_count', String(cp.freePdfCount));
       }

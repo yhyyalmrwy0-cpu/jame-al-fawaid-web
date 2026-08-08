@@ -1,9 +1,15 @@
-const CACHE_NAME = 'jami-alfawaid-v1';
+const CACHE_NAME = 'jami-alfawaid-v3';
 const PRECACHE_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/app_logo.svg'
+  "/",
+  "/index.html",
+  "/manifest.json",
+  "/app_logo.svg",
+  "/fonts/cairo-regular-arabic.woff2",
+  "/fonts/cairo-regular-latin.woff2",
+  "/fonts/cairo-bold-arabic.woff2",
+  "/fonts/cairo-bold-latin.woff2",
+  "/fonts/amiri-regular.woff2",
+  "/fonts/amiri-bold.woff2"
 ];
 
 // Install Event - Pre-cache core files
@@ -34,44 +40,30 @@ self.addEventListener('activate', (event) => {
 
 // Fetch Event - Serve from cache, fallback to network and dynamically cache
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests
   if (event.request.method !== 'GET') return;
   
   const url = new URL(event.request.url);
-  
-  // Skip non-HTTP(S) schemas (e.g. chrome-extension://, mailto:)
   if (!url.protocol.startsWith('http')) return;
-  
-  // Skip external APIs/services that shouldn't be cached, unless they are Google fonts
-  if (url.origin !== self.location.origin && !url.host.includes('googleapis.com') && !url.host.includes('gstatic.com')) {
-    return;
-  }
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // If it's a versioned asset, return it immediately
         if (url.pathname.includes('/assets/')) {
           return cachedResponse;
         }
 
-        // Stale-While-Revalidate for other pages
-        const fetchPromise = fetch(event.request).then((networkResponse) => {
+        fetch(event.request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const responseToCache = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, responseToCache);
             });
           }
-          return networkResponse;
-        }).catch(() => {
-          // Fail silently on background check if offline
-        });
+        }).catch(() => {});
 
         return cachedResponse;
       }
 
-      // If not in cache, fetch from network and cache
       return fetch(event.request).then((networkResponse) => {
         if (!networkResponse || networkResponse.status !== 200) {
           return networkResponse;
@@ -84,7 +76,6 @@ self.addEventListener('fetch', (event) => {
 
         return networkResponse;
       }).catch((err) => {
-        // If offline and navigate mode, fallback to index
         if (event.request.mode === 'navigate') {
           return caches.match('/');
         }

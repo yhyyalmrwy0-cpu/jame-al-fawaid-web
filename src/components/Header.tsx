@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { BookOpen, RefreshCw, Trophy, Sparkles, Copy, Check, PenLine, X } from 'lucide-react';
+import { BookOpen, RefreshCw, Trophy, Sparkles, Copy, Check, PenLine, X, Menu } from 'lucide-react';
 import { Benefit, AppSettings } from '../types';
 import { AppLogo } from './AppLogo';
 
@@ -12,6 +12,7 @@ interface HeaderProps {
   settings: AppSettings;
   onUpdateSettings: (settings: AppSettings) => void;
   onUnlockControlPanel?: () => void;
+  onOpenSidebar?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -22,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   settings,
   onUpdateSettings,
   onUnlockControlPanel,
+  onOpenSidebar,
 }) => {
   const [randomBenefit, setRandomBenefit] = useState<Benefit | null>(null);
   const [copied, setCopied] = useState(false);
@@ -277,8 +279,10 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Total Benefits Counter Badge - Islamic Star/Seal Design */}
-        <div className="relative overflow-hidden flex items-center gap-4 bg-white/5 hover:bg-white/10 transition-all duration-300 px-5 py-3.5 rounded-2xl border border-white/10 shrink-0 select-none shadow-lg group">
+        {/* Right side controls: Total counter badge */}
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+          {/* Total Benefits Counter Badge - Islamic Star/Seal Design */}
+          <div className="relative overflow-hidden flex items-center gap-4 bg-white/5 hover:bg-white/10 transition-all duration-300 px-5 py-3.5 rounded-2xl border border-white/10 shrink-0 select-none shadow-lg group">
           {/* Inner ambient glow */}
           <div className="absolute -left-6 -bottom-6 w-16 h-16 bg-brand-gold/10 rounded-full blur-xl group-hover:bg-brand-gold/20 transition-all duration-300" />
           
@@ -306,6 +310,7 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           </div>
         </div>
+      </div>
       </div>
 
       {/* Random Daily Benefit Segment */}
@@ -392,7 +397,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </h3>
                 
                 {/* Refined frame for the quote block inside the daily benefit card */}
-                <p className="text-sm sm:text-base text-zinc-800 leading-relaxed font-serif line-clamp-4 pr-3.5 border-r-2 border-brand-emerald/20 group-hover:border-brand-emerald/40 transition-colors">
+                <p className="text-sm sm:text-[15px] text-zinc-800 leading-relaxed benefit-text font-normal line-clamp-4 pr-3.5 border-r-2 border-brand-emerald/20 group-hover:border-brand-emerald/40 transition-colors">
                   {randomBenefit.content}
                 </p>
                 
