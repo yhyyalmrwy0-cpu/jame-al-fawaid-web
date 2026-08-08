@@ -2,11 +2,11 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Cairo", "Tajawal", "Segoe UI", "Simplified Arabic", system-ui, sans-serif;
-  --font-serif: "Noto Naskh Arabic", "Scheherazade New", "Amiri", "Traditional Arabic", Georgia, serif;
-  --font-benefit: "Noto Naskh Arabic", "Scheherazade New", "Amiri", "Traditional Arabic", serif;
+  --font-sans: "Cairo", "Segoe UI", "Simplified Arabic", system-ui, sans-serif;
+  --font-serif: "Amiri", "Traditional Arabic", Georgia, serif;
+  --font-benefit: "Amiri", "Traditional Arabic", serif;
   --font-cairo: "Cairo", sans-serif;
-  --font-tajawal: "Tajawal", "Cairo", sans-serif;
+  --font-tajawal: "Cairo", sans-serif;
   --font-amiri: "Amiri", serif;
   
   --color-brand-beige: #FDFBF7;
@@ -19,7 +19,7 @@
 }
 
 .benefit-text {
-  font-family: "Noto Naskh Arabic", "Scheherazade New", "Amiri", "Traditional Arabic", serif !important;
+  font-family: "Amiri", "Traditional Arabic", Georgia, serif !important;
   font-weight: 400 !important;
   font-style: normal;
   line-height: 1.85;

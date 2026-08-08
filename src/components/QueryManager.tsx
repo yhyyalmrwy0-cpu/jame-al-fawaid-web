@@ -342,7 +342,7 @@ export const QueryManager: React.FC<QueryManagerProps> = ({
                     onChange={(e) => setContent(e.target.value)}
                     placeholder="وضح المسألة والوجه الذي وقع فيه الإشكال بدقة وعناية... (بدون أي حد أقصى للحجم)"
                     rows={5}
-                    className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-serif text-sm text-zinc-800 bg-zinc-50/50 leading-relaxed resize-y"
+                    className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all benefit-text text-sm text-zinc-800 bg-zinc-50/50 leading-relaxed resize-y"
                   />
                   <button
                     type="button"
@@ -428,7 +428,7 @@ export const QueryManager: React.FC<QueryManagerProps> = ({
                         onChange={(e) => setResolution(e.target.value)}
                         placeholder="اكتب هنا التحقيق وجواب أهل العلم والنتيجة التي انشرح صدرك لها وحلت الإشكال..."
                         rows={3}
-                        className="w-full px-3 py-2 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-serif text-sm text-zinc-800 bg-emerald-50/20 leading-relaxed"
+                        className="w-full px-3 py-2 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all benefit-text text-sm text-zinc-800 bg-emerald-50/20 leading-relaxed"
                       />
                     </motion.div>
                   )}
@@ -625,7 +625,7 @@ export const QueryManager: React.FC<QueryManagerProps> = ({
                         onChange={(e) => setInlineResolution(e.target.value)}
                         placeholder="اكتب هنا التحقيق وجواب أهل العلم والنتيجة التي انشرح صدرك لها وحلت الإشكال..."
                         rows={3}
-                        className="w-full pl-11 pr-3 py-2 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-serif text-xs text-zinc-800 bg-white leading-relaxed"
+                        className="w-full pl-11 pr-3 py-2 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all benefit-text text-xs text-zinc-800 bg-white leading-relaxed"
                       />
                       <button
                         type="button"

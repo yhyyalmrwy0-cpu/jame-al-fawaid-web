@@ -85,7 +85,7 @@ export const AndroidSystemNotification: React.FC<AndroidSystemNotificationProps>
             <h4 className="text-sm font-bold text-brand-gold-light leading-tight line-clamp-1">
               تنبيه بفائدة اليوم: {benefit.title}
             </h4>
-            <p className="text-xs text-zinc-300 mt-1 line-clamp-2 leading-relaxed font-serif">
+            <p className="text-xs text-zinc-300 mt-1 line-clamp-2 leading-relaxed benefit-text">
               {benefit.content}
             </p>
             <div className="text-[11px] text-zinc-400 mt-1 flex items-center gap-2">

@@ -145,36 +145,43 @@ export default function App() {
   };
 
   const searchInputRef = React.useRef<HTMLInputElement>(null);
+  const searchContainerRef = React.useRef<HTMLDivElement | null>(null);
+
+  const scrollToSearchTop = () => {
+    const targetElement = searchContainerRef.current || searchInputRef.current;
+    if (targetElement) {
+      const rect = targetElement.getBoundingClientRect();
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      // Scroll immediately to top without any delay or gap (0 margin)
+      const targetY = Math.max(0, scrollTop + rect.top);
+      window.scrollTo({
+        top: targetY,
+        behavior: 'instant' as ScrollBehavior
+      });
+      // Fallback direct scroll for older browsers
+      document.documentElement.scrollTop = targetY;
+      document.body.scrollTop = targetY;
+    }
+  };
 
   const handleFloatingSearchClick = () => {
     const performScrollAndFocus = () => {
-      if (searchInputRef.current) {
-        // Find the element position relative to the viewport
-        const rect = searchInputRef.current.getBoundingClientRect();
-        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        // Scroll exactly to the element position with a 16px offset from the very top of the viewport
-        const targetY = scrollTop + rect.top - 16;
-        
-        window.scrollTo({
-          top: targetY,
-          behavior: 'smooth'
-        });
+      scrollToSearchTop();
 
-        // Focus and place cursor at the end
-        setTimeout(() => {
-          if (searchInputRef.current) {
-            searchInputRef.current.focus();
-            const val = searchInputRef.current.value;
-            searchInputRef.current.value = '';
-            searchInputRef.current.value = val;
-          }
-        }, 300);
-      }
+      // Focus input immediately to open virtual keyboard on mobile
+      setTimeout(() => {
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+          const val = searchInputRef.current.value;
+          searchInputRef.current.value = '';
+          searchInputRef.current.value = val;
+        }
+      }, 50);
     };
 
     if (activeTab !== 'home') {
       setActiveTab('home');
-      setTimeout(performScrollAndFocus, 300);
+      setTimeout(performScrollAndFocus, 100);
     } else {
       performScrollAndFocus();
     }
@@ -578,7 +585,6 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const searchContainerRef = React.useRef<HTMLDivElement | null>(null);
   const [isFullTextSearch, setIsFullTextSearch] = useState(false); // Toggle for full text body search
   const [visibleCount, setVisibleCount] = useState(10); // Pagination / Lazy loading count (10 initially)
   const [selectedCategory, setSelectedCategory] = useState<string>('الكل');
@@ -1892,24 +1898,44 @@ export default function App() {
                 )}
               </AnimatePresence>
 
-              {/* Search Bar placed DIRECTLY above the benefits list */}
+              {/* Search Bar placed DIRECTLY above the benefits list - sticky fixed at top with translucent blur */}
               <div 
                 ref={searchContainerRef}
-                onFocus={() => setIsSearchFocused(true)}
+                onPointerDown={() => scrollToSearchTop()}
+                onTouchStart={() => scrollToSearchTop()}
+                onFocus={() => {
+                  setIsSearchFocused(true);
+                  scrollToSearchTop();
+                }}
+                onClick={() => {
+                  scrollToSearchTop();
+                }}
                 onBlur={(e) => {
                   if (searchContainerRef.current && searchContainerRef.current.contains(e.relatedTarget as Node)) {
                     return;
                   }
                   setIsSearchFocused(false);
                 }}
-                className="relative w-full space-y-2"
+                className="sticky top-0 z-30 w-full bg-[#FDFBF7]/80 backdrop-blur-md pt-2 pb-2 px-1 border-b border-brand-emerald/15 shadow-sm transition-all"
               >
                 <div className="relative w-full">
                   <input
                     ref={searchInputRef}
                     type="text"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onPointerDown={() => scrollToSearchTop()}
+                    onTouchStart={() => scrollToSearchTop()}
+                    onFocus={() => {
+                      setIsSearchFocused(true);
+                      scrollToSearchTop();
+                    }}
+                    onClick={() => {
+                      scrollToSearchTop();
+                    }}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      scrollToSearchTop();
+                    }}
                     placeholder="🔍 ابحث في العناوين والوسوم والمصادر..."
                     className={`w-full pr-11 py-3 bg-white text-zinc-800 rounded-2xl border-2 border-brand-emerald/20 hover:border-brand-emerald/40 text-sm focus:outline-none focus:ring-2 focus:ring-brand-emerald focus:border-transparent transition-all font-sans shadow-md ${
                       searchQuery ? 'pl-11' : 'pl-4'
